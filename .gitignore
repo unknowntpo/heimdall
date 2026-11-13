@@ -1,0 +1,43 @@
+# Python / uv
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+dist/
+build/
+
+# Model weights and adapters (never commit; too large and licence-bound)
+*.gguf
+*.safetensors
+*.bin
+*.npz
+adapters/
+models/
+checkpoints/
+
+# Datasets (download with scripts; only small hand-written fixtures are committed)
+data/raw/
+data/interim/
+data/processed/
+*.parquet
+!tests/fixtures/**
+
+# Evaluation outputs and logs
+runs/
+eval-results/
+*.log
+
+# Local environment
+.env
+.env.*
+!.env.example
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
