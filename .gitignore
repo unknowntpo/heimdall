@@ -41,3 +41,7 @@ eval-results/
 .DS_Store
 .idea/
 .vscode/
+
+# Walking skeleton outputs (regenerate with `uv run heimdall data` / `train`)
+data/
+artifacts/
