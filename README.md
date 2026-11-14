@@ -52,5 +52,6 @@ uv run pytest -q                          # 離線 unit test
 ## 文件
 
 - 路線圖 spec：[docs/specs/0001-lifecycle-roadmap.md](docs/specs/0001-lifecycle-roadmap.md)
+- Walking skeleton spike：[docs/specs/0002-walking-skeleton.md](docs/specs/0002-walking-skeleton.md)
 - 資料流圖：[docs/dataflow/heimdall-flow.html](docs/dataflow/heimdall-flow.html)
 - 開發流程：[docs/process/workflow.md](docs/process/workflow.md)
