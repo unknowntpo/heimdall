@@ -44,6 +44,7 @@
     "near_contradiction_rows": 0,
     "contradiction_groups": 0,
     "contradiction_rows": 0,
+    "orphan_translations_dropped": 0,
     "cross_split": {
       "train_vs_val_test": 0,
       "val_vs_test": 0
@@ -57,23 +58,23 @@
         "safe": 3028,
         "injection": 1235
       },
-      "sha256": "93a57af95917eb65b35c1c71aa405db9a5660143740f77c66c09c35f69683b9e"
+      "sha256": "2dfea6c10f1de4aacd288b0cec8d4276c1857834c0482ee10753ab4d76befe5b"
     },
     "val": {
-      "rows": 1105,
+      "rows": 1104,
       "labels": {
         "safe": 661,
-        "injection": 444
+        "injection": 443
       },
-      "sha256": "a15dc54d534e576e36749a7d2e0d60185d480437389139f4da205b0c2a4bfc31"
+      "sha256": "bdb70f20fce71ea355eb9abf291db565c78a6b961ad2da0ffde3b84f33b00b69"
     },
     "test": {
-      "rows": 1030,
+      "rows": 1031,
       "labels": {
         "safe": 673,
-        "injection": 357
+        "injection": 358
       },
-      "sha256": "35bf809d14d28307864bbf71515d139eafee29ab1e5d01b4f562f698f98d22ed"
+      "sha256": "3dcf4b812e5f205f991f91cfa61e74a1ac55e15c5f845800f982e0c6bb0849f7"
     }
   },
   "stats": {
@@ -107,7 +108,7 @@
     },
     "val": {
       "by_label": {
-        "injection": 444,
+        "injection": 443,
         "safe": 661
       },
       "by_source": {
@@ -117,7 +118,7 @@
         "deepset/prompt-injections|safe": 64,
         "jackhhao/jailbreak-classification|injection": 82,
         "jackhhao/jailbreak-classification|safe": 93,
-        "rikka-snow/prompt-injection-multilingual|injection": 44,
+        "rikka-snow/prompt-injection-multilingual|injection": 43,
         "rikka-snow/prompt-injection-multilingual|safe": 59
       },
       "by_lang": {
@@ -125,17 +126,17 @@
         "de|safe": 25,
         "en|injection": 386,
         "en|safe": 577,
-        "zh-Hant|injection": 44,
+        "zh-Hant|injection": 43,
         "zh-Hant|safe": 59
       },
       "median_chars": {
         "safe": 58,
-        "injection": 77.0
+        "injection": 77
       }
     },
     "test": {
       "by_label": {
-        "injection": 357,
+        "injection": 358,
         "safe": 673
       },
       "by_source": {
@@ -145,7 +146,7 @@
         "deepset/prompt-injections|safe": 56,
         "jackhhao/jailbreak-classification|injection": 128,
         "jackhhao/jailbreak-classification|safe": 123,
-        "rikka-snow/prompt-injection-multilingual|injection": 58,
+        "rikka-snow/prompt-injection-multilingual|injection": 59,
         "rikka-snow/prompt-injection-multilingual|safe": 54
       },
       "by_lang": {
@@ -153,12 +154,12 @@
         "de|safe": 20,
         "en|injection": 279,
         "en|safe": 599,
-        "zh-Hant|injection": 58,
+        "zh-Hant|injection": 59,
         "zh-Hant|safe": 54
       },
       "median_chars": {
         "safe": 63,
-        "injection": 131
+        "injection": 131.0
       }
     }
   }
