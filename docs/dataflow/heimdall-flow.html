@@ -116,10 +116,11 @@ const FLOW = {
         {id:"p4", kind:"rule", icon:"4", name:"Train / val / test split", meta:"避免 leakage"} ]} ],
     [ {id:"c-base", title:"Baselines", badge:"對照組", nodes:[
         {id:"b1", kind:"rule", icon:"KW", name:"Keyword heuristic", meta:"關鍵字規則"},
-        {id:"b2", kind:"ai", icon:"0S", name:"Zero-shot base model", meta:"未微調"} ]},
-      {id:"c-train", title:"LoRA training", badge:"MLX", nodes:[
+        {id:"b2", kind:"ai", icon:"0S", name:"Zero-shot base model", meta:"未微調"},
+        {id:"b3", kind:"ai", icon:"EN", name:"Encoder 分類器", meta:"PyTorch fine-tune"} ]},
+      {id:"c-train", title:"LoRA training", badge:"PyTorch", nodes:[
         {id:"t1", kind:"warn", icon:"BM", name:"Base model", meta:"Qwen 0.5B / SmolLM2-360M 級", tag:["off","未定"]},
-        {id:"t2", kind:"ai", icon:"LA", name:"LoRA adapter", meta:"MLX · Apple M1 Pro"} ],
+        {id:"t2", kind:"ai", icon:"LA", name:"LoRA adapter", meta:"PyTorch + PEFT · Apple M1 Pro"} ],
         stats:[["記憶體","32 GB"]]},
       {id:"c-gate", title:"Evaluation gate", badge:"gate", nodes:[
         {id:"g1", kind:"rule", icon:"Q", name:"品質指標", meta:"precision · recall · F1 · FPR"},
@@ -157,9 +158,10 @@ const FLOW = {
     p3: {t:"步驟 3：Dedupe", lead:"去除重複或近似重複的樣本，避免同一句話同時出現在 train 和 test。", kv:[["比對方式","未定"]]},
     p4: {t:"步驟 4：Train / val / test split", lead:"切出 train、val、test 三份，切法要避免 leakage（同源或相似樣本跨切分）。", kv:[["比例","未定"],["用途","train 給訓練、val 調參、test 給 Evaluation gate"]]},
     b1: {t:"Keyword heuristic", lead:"用關鍵字規則判斷 injection，當作最低對照組。LoRA 模型要贏過它才有意義。", kv:[["類型","確定性規則，無模型"],["關鍵字清單","未定"]]},
+    b3: {t:"Encoder 分類器", lead:"用 PyTorch 微調一個小型 encoder 做二元分類。訓練快，最先產出 precision、recall、F1，也和 LoRA LLM 並排比較。", kv:[["框架","PyTorch，手寫 training loop"],["模型","未定"]]},
     b2: {t:"Zero-shot base model", lead:"未微調的 base model 直接用 prompt 判斷，用來量出 LoRA 微調帶來的差距。", kv:[["模型","與 LoRA 使用同一個 base model（未定）"]]},
     t1: {t:"Base model", lead:"小型 decoder LLM，尚未選定。候選是 Qwen 0.5B 級或 SmolLM2-360M 級。", kv:[["狀態","未定"],["候選","Qwen 0.5B 級、SmolLM2-360M 級"],["選擇依據","待驗證（看 Baselines 與評測結果）"]]},
-    t2: {t:"LoRA adapter", lead:"在本機用 MLX 對 base model 做 LoRA 微調，只訓練 adapter 權重。", kv:[["框架","MLX"],["硬體","Apple M1 Pro，32 GB 記憶體"],["超參數","未定"]]},
+    t2: {t:"LoRA adapter", lead:"在本機用 PyTorch（MPS）加 Hugging Face PEFT 對 base model 做 LoRA 微調，只訓練 adapter 權重。", kv:[["框架","PyTorch + PEFT；MPS 太慢時改用 MLX-LM（待驗證）"],["硬體","Apple M1 Pro，32 GB 記憶體"],["超參數","未定"]]},
     g1: {t:"品質指標", lead:"在 test split 與 zh-TW golden set 上量測，並與 Baselines 比較。", kv:[["指標","precision、recall、F1、false-positive rate"],["比較對象","Keyword heuristic、Zero-shot base model"],["結果","尚未量測"]]},
     g2: {t:"Latency", lead:"量測單次判斷的延遲，看 p50 與 p95。", kv:[["指標","p50、p95"],["結果","尚未量測"]]},
     g3: {t:"Evaluation gate：通過門檻", lead:"模型要通過這道 gate 才能進入 Packaging。量化後的模型也要再過一次。目前每個指標的門檻數值都還沒設定。", kv:[["門檻","未定"],["輸入","LoRA 模型、Baselines 結果"],["通過後","進入 Packaging"],["量化後","Re-evaluate 再檢查一次"]]},

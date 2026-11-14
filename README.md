@@ -18,8 +18,8 @@ Heimdall 是一個 prompt injection / jailbreak 偵測模型（guardrail model�
 | --- | --- |
 | M0 | Spec 與驗收門檻 |
 | M1 | 資料：公開資料集、授權檢查、正規化、去重、無 leakage 的 train / val / test 切分、zh-TW golden set |
-| M2 | Baseline：關鍵字規則；未 fine-tune 的 base model zero-shot |
-| M3 | 用 MLX 做 LoRA（Low-Rank Adaptation）fine-tune |
+| M2 | Baseline：關鍵字規則；未 fine-tune 的 base model zero-shot；PyTorch 小型 encoder 分類器 |
+| M3 | 用 PyTorch 與 PEFT 做 LoRA（Low-Rank Adaptation）fine-tune |
 | M4 | 評估（precision、recall、F1、誤報率、延遲 p50 / p95）與 release gate |
 | M5 | 打包：fuse adapter、轉 GGUF（llama.cpp 模型格式）、量化、量化後重新評估 |
 | M6 | Serving：`llama-server` 加薄 HTTP API `POST /v1/guard`；合約測試 |
@@ -31,7 +31,7 @@ Heimdall 是一個 prompt injection / jailbreak 偵測模型（guardrail model�
 
 ## 目前狀態
 
-規劃中。尚無程式碼、資料或模型。所有決策都是 proposed，等待 owner 審查。
+D1–D3 已由 owner 接受（2026-11-14）。第一階段範圍是 M1–M4。其餘決策仍是 proposed。
 
 ## 文件
 

@@ -1,6 +1,6 @@
 # Spec 0001: LLM 開發生命週期路線圖（Lifecycle Roadmap）
 
-Status: Draft（proposed, awaiting owner review）
+Status: Draft（D1–D3 accepted by owner 2026-11-14；其餘 proposed）
 Date: 2026-11-13
 Traceability: not enforced（本 spec 只做規劃，沒有程式碼；各 milestone 的 spec 才會 enforced）
 Builds on: 無（本 repo 的第一份 spec）
@@ -16,8 +16,8 @@ Owner 想親手走完一次 LLM（large language model，大型語言模型）�
 ## Evidence
 
 - 目前 repo 只有本規劃文件。沒有資料、模型或量測數字。
-- 已知硬體：Apple M1 Pro、32 GB 記憶體、約 26 GB 可用磁碟空間。
-- 已安裝：`uv`、`ollama`、`llama-server`（llama.cpp 的 HTTP server）。尚未安裝：MLX-LM。
+- 已知硬體：Apple M1 Pro、32 GB 記憶體、約 42 GB 可用磁碟空間（2026-11-14 量測）。
+- 已安裝：`uv`、`ollama`、`llama-server`（llama.cpp 的 HTTP server）。
 - 所有模型大小、授權與 benchmark 數字都還沒驗證，本文一律標為「to verify」。
 
 ## 名詞
@@ -29,7 +29,12 @@ Owner 想親手走完一次 LLM（large language model，大型語言模型）�
 | LoRA | Low-Rank Adaptation。凍結 base model 權重，只訓練小型低秩矩陣（adapter）。 |
 | adapter | LoRA 訓練產出的小型權重檔，需與 base model 合併或一起載入。 |
 | fuse | 把 adapter 權重合併進 base model，得到單一模型。 |
-| MLX / MLX-LM | Apple 為 Apple silicon 提供的機器學習框架；MLX-LM 是其上的 LLM 工具，包含 LoRA 訓練。 |
+| MLX / MLX-LM | Apple 為 Apple silicon 提供的機器學習框架；MLX-LM 是其上的 LLM 工具，包含 LoRA 訓練。本專案只當備案。 |
+| MPS | Metal Performance Shaders。PyTorch 在 Apple silicon 上使用 GPU 的 backend。 |
+| PEFT | Parameter-Efficient Fine-Tuning。Hugging Face 的函式庫，提供 LoRA 等方法。 |
+| encoder 分類器 | 以 BERT 類 encoder 模型加一層分類頭做分類，不產生文字。 |
+| McNemar test | 比較兩個模型在同一批樣本上正確率差異的成對檢定，只看兩者答案不同的樣本。 |
+| paired bootstrap | 對同一批樣本重複抽樣，同時重算兩個模型的指標，得到差距的信賴區間（CI）。 |
 | GGUF | llama.cpp 使用的模型檔案格式。 |
 | quantise（量化） | 降低權重的數值精度（例如 16-bit 降到 4-bit），換取更小的檔案與更快的推論。 |
 | FPR | false-positive rate，誤報率：真實為 `safe` 的樣本中，被判為 `injection` 的比例。 |
@@ -38,15 +43,15 @@ Owner 想親手走完一次 LLM（large language model，大型語言模型）�
 | release gate | 發布門檻：評估數字未達標時，禁止進入下一個 milestone 或環境。 |
 | canary | 金絲雀發布：先把少量流量導向新版本，觀察後再全量切換。 |
 
-## 決策表（proposed, awaiting owner review）
+## 決策表
 
-每個決策都還沒經 owner 確認。被否決的方案附一行理由。
+D1、D2、D3 已由 owner 於 2026-11-14 接受。D4、D5 仍是 proposed。被否決的方案附一行理由。
 
 ### D1. 任務範圍
 
 | 選項 | 狀態 | 理由 |
 | --- | --- | --- |
-| Prompt injection / jailbreak 二元偵測：輸入一段文字，輸出 `safe` 或 `injection` 與分數 | **proposed** | 二元標籤容易驗證；公開資料集候選較多。 |
+| Prompt injection / jailbreak 二元偵測：輸入一段文字，輸出 `safe` 或 `injection` 與分數 | **accepted** | 二元標籤容易驗證；公開資料集候選較多。 |
 | 多類別 content safety（暴力、仇恨、自傷等） | rejected（第一輪） | 類別定義與標註成本高，延到第二輪。 |
 | 同時偵測輸入與輸出（雙向 guardrail） | rejected（第一輪） | 輸出檢查需要另一組資料與評估，先只做輸入。 |
 
@@ -54,24 +59,26 @@ Owner 想親手走完一次 LLM（large language model，大型語言模型）�
 
 | 選項 | 狀態 | 理由 |
 | --- | --- | --- |
-| 小型 decoder LLM 加 LoRA fine-tune，在本機用 MLX 訓練 | **proposed** | 涵蓋 fine-tune、fuse、轉 GGUF、量化、serving 的完整 LLM 流程。 |
-| Encoder 分類器（例如 DeBERTa 類）fine-tune | rejected | 準確度可能夠，但跳過 GGUF 與 LLM serving，練不到 LLM 生命週期。 |
+| 兩個模型並排：M2 用 PyTorch fine-tune 小型 encoder 分類器；M3 用 PyTorch 加 PEFT 對小型 decoder LLM 做 LoRA | **accepted** | Encoder 訓練快，最先產出指標；LoRA LLM 涵蓋 fuse、轉 GGUF、量化、serving。兩者可在同一測試集上比較。 |
+| 只做 decoder LLM 加 LoRA | rejected | 第一個可量測的模型出現得太晚，也少一個比較對象。 |
+| 只做 encoder 分類器 | rejected | 跳過 GGUF 與 LLM serving，練不到 LLM 生命週期。 |
 | 直接採用現成 guard model | rejected（主路線） | 沒有訓練步驟。可在 M2 當參考對照，由 owner 決定。 |
 | Prompt engineering，不訓練 | rejected（主路線） | 保留為 M2 的 zero-shot baseline，不當最終方案。 |
 
-Base model 候選（M1 之後的 model-selection 步驟決定；授權、參數量、記憶體需求皆 to verify）：
+模型候選（M1 之後的 model-selection 步驟決定；授權、參數量、記憶體需求皆 to verify）：
 
 | 候選 | 待驗證項目 |
 | --- | --- |
-| Qwen 0.5B 級（例如 Qwen2.5-0.5B-Instruct） | 授權、參數量、MLX-LM 與 llama.cpp 支援、zh-TW 表現 |
-| SmolLM2-360M 級（例如 SmolLM2-360M-Instruct） | 授權、參數量、MLX-LM 與 llama.cpp 支援、zh-TW 表現 |
+| Qwen 0.5B 級（例如 Qwen2.5-0.5B-Instruct） | 授權、參數量、llama.cpp 支援、zh-TW 表現 |
+| SmolLM2-360M 級（例如 SmolLM2-360M-Instruct） | 授權、參數量、llama.cpp 支援、zh-TW 表現 |
+| 小型 encoder（例如 DeBERTa-v3-small 級或多語言 DistilBERT 級） | 授權、參數量、MPS 相容性、zh-TW 表現 |
 
 ### D3. 訓練環境
 
 | 選項 | 狀態 | 理由 |
 | --- | --- | --- |
-| 本機 Apple M1 Pro，用 MLX-LM 做 LoRA | **proposed** | 不需雲端 GPU 費用；MLX 為 Apple silicon 設計。 |
-| PyTorch + MPS backend | rejected | 在 Apple silicon 上可用，但 MLX-LM 已內建 LoRA 與 fuse 流程，步驟較少。 |
+| 本機 Apple M1 Pro，用 PyTorch（MPS backend）；LoRA 用 PEFT | **accepted** | PyTorch 是業界通用框架，訓練程式可直接搬到 CUDA 環境。 |
+| MLX-LM | 備案 | 為 Apple silicon 設計，可能較快（to verify）。M3 的計時試驗顯示 MPS 太慢時才改用。 |
 | 雲端 GPU | rejected（第一輪） | 有費用與帳號設定；0.5B 級模型預期本機可訓練（記憶體需求 to verify）。 |
 
 ### D4. Serving
@@ -167,9 +174,9 @@ Content-Type: application/json
 ### M0. Spec 與驗收門檻
 
 - 交付物：本 spec 經 owner 審查；門檻數值寫入本 spec。
-- 退出條件：owner 已回答「待 owner 決定的問題」中的 Q1–Q4。
+- 退出條件：owner 已回答 Q1 與 Q2（2026-11-14 已回答）。門檻數值延到 M2 之後，依 baseline 的實測數字填入。
 - R0.1：前提為本 spec 是 Draft → owner 審查 → Status 改為 Accepted → 證據為 merge 本 spec 的 commit。
-- R0.2：前提為門檻尚未決定 → owner 填入 precision、recall、FPR、p95 延遲的目標值 → 本 spec 的「門檻」表不再有 TBD → 證據為該表的 diff。
+- R0.2：前提為 M2 的 baseline 報告已產出 → owner 填入 precision、recall、FPR、p95 延遲的目標值 → 本 spec 的「門檻」表不再有 TBD → 證據為該表的 diff。
 
 ### M1. 資料
 
@@ -193,27 +200,34 @@ Content-Type: application/json
 
 ### M2. Baseline
 
-- 交付物：兩個 baseline 及其在 test 與 golden set 上的分數。
-- 退出條件：兩個 baseline 都有評估報告；後續模型必須與它們比較。
+- 交付物：三個 baseline 及其在 test 與 golden set 上的分數。
+- 退出條件：三個 baseline 都有評估報告；後續模型必須與它們比較。
 - R2.1：前提為 keyword heuristic（關鍵字規則）→ 對一筆含「忽略之前的指示」的文字與一筆一般請求執行 → 前者為 `injection`、後者為 `safe` → 證據為測試。
 - R2.2：前提為未 fine-tune 的 base model 加固定 prompt → 對同一組文字執行 zero-shot 分類 → 輸出只會是兩個標籤之一；無法解析時記為錯誤，不靜默當成 `safe` → 證據為測試。
-- R2.3：[measure] 兩個 baseline 在 test 與 golden set 上的 precision、recall、F1、FPR → 證據為評估命令與報告。
+- R2.4：前提為固定設定與 random seed → 用手寫的 PyTorch training loop 在小型 fixture 上 fine-tune encoder 分類器幾步 → 正常結束且 loss 下降 → 證據為 smoke 測試。
+- R2.3：[measure] 三個 baseline 在 test 與 golden set 上的 precision、recall、F1、FPR → 證據為評估命令與報告。
 
-### M3. LoRA 訓練（MLX）
+### M3. LoRA 訓練（PyTorch + PEFT）
 
 - 交付物：可重跑的訓練命令與設定檔；adapter 檔案（不 commit，記錄 hash）。
 - 退出條件：訓練在本機完成；adapter 在 val 上優於 M2 的 zero-shot baseline。
 - R3.1：前提為固定設定與 random seed → 在小型 fixture 上跑幾步訓練 → 正常結束且 loss 下降 → 證據為 smoke 測試。
 - R3.2：前提為訓練中斷 → 從最後一個 checkpoint 重啟 → 訓練從該步繼續，而不是從頭開始 → 證據為測試或記錄的命令輸出。
+- R3.4：[measure] 訓練前先做一次限時 30 分鐘的計時試驗，量 MPS 上每步時間與峰值記憶體；依結果決定續用 PyTorch 或改用 MLX-LM → 證據為量測命令、輸出與決定。
 - R3.3：[measure] 峰值記憶體與訓練時間；總磁碟用量不超過 owner 指定上限（Q4） → 證據為量測命令與輸出。
 
 ### M4. 評估與 release gate
 
-- 交付物：評估命令；報告包含 precision、recall、F1、FPR、延遲 p50 / p95；依 val 選定的 threshold；release gate 腳本。
+- 交付物：評估命令；報告包含 precision、recall、F1、FPR、延遲 p50 / p95；依 val 選定的 threshold；release gate 腳本；兩個模型的成對比較。
+- 判定規則：退步的 CI 下界不低於 −τ 才放行（τ 由 owner 在門檻表指定）。宣稱改善需要 CI 下界大於 0，且 McNemar p < 0.05。正確率用 McNemar；precision、recall、FPR 的差距用 paired bootstrap 的 CI。
 - 退出條件：fine-tuned 模型在 test 與 golden set 上通過門檻。
 - R4.1：前提為已知標籤與預測的小型 fixture → 執行指標計算 → precision、recall、F1、FPR 與手算值一致 → 證據為測試。
 - R4.2：前提為一份未達門檻的評估報告 → 執行 release gate → gate 以非零狀態結束並列出未達標的指標；達標的報告則通過 → 證據為測試（兩種報告都要測）。
 - R4.3：前提為 test set → threshold 只用 val 選定 → 選定流程不讀取 test 或 golden set → 證據為測試。
+- R4.5：前提為兩個模型在同一批樣本上的預測 → 執行成對比較 → 輸出 b（舊對新錯）、c（舊錯新對）與 McNemar exact test 的 p 值；`b + c < 6` 時輸出 `insufficient-evidence` → 證據為測試（與手算值比對，含 `b + c < 6` 的 case）。
+- R4.6：前提為同一組預測與固定 seed → 執行 paired bootstrap（同一組 index 對兩個模型一起重抽 10,000 次）→ 輸出各指標差距的 95% CI；同一 seed 重跑結果相同 → 證據為測試。
+- R4.7：前提為正例或負例少於 300 筆的測試集 → 執行比較 → 結論只能是 `too-small`，不能宣稱改善 → 證據為測試（含一筆剛好 300 的對照）。
+- R4.8：前提為一次評估 run → 執行 → 紀錄含 commit、資料 sha256、模型 hash、參數、機器，並寫入 MLflow（本機檔案模式）→ 證據為測試。
 - R4.4：[measure] 完整評估結果與延遲 p50 / p95，附 commit 與模型 hash → 證據為報告。
 
 ### M5. 打包
@@ -268,18 +282,18 @@ Content-Type: application/json
 | 文件審查 | R0.1、R0.2 | owner 審查 commit |
 | 資料管線 unit test | R1.1–R1.5 | pytest，fixture 內含正例與對照例 |
 | 資料統計 | R1.6 | 已提交的統計命令 |
-| Baseline unit test | R2.1、R2.2 | pytest |
+| Baseline unit test | R2.1、R2.2、R2.4 | pytest |
 | 訓練 smoke test | R3.1、R3.2 | 小型 fixture 上的短訓練 |
-| 指標與 gate unit test | R4.1–R4.3、R5.2 | pytest，含達標與未達標兩種報告 |
+| 指標、統計檢定與 gate unit test | R4.1–R4.3、R4.5–R4.8、R5.2 | pytest，含達標與未達標兩種報告 |
 | 打包一致性 | R5.1 | 同一 fixture 比較兩個模型 |
 | API 合約測試 | R6.1–R6.4、R9.1 | 對本機服務送 HTTP request |
 | CI | R7.1、R7.2 | GitHub Actions run |
 | 部署驗證 | R8.1–R8.3、R9.2 | 對 staging / prod 執行合約測試與查詢命令 |
-| 量測 | R1.6、R2.3、R3.3、R4.4、R5.3、R7.3、R8.4 | 已提交的量測命令與報告 |
+| 量測 | R1.6、R2.3、R3.3、R3.4、R4.4、R5.3、R7.3、R8.4 | 已提交的量測命令與報告 |
 
 每個邊界（例如 threshold、長度上限）在 milestone spec 裡兩側各要一個 case。
 
-## 門檻（M0 由 owner 決定）
+## 門檻（M2 之後由 owner 決定）
 
 | 指標 | 目標 | 量測集合 |
 | --- | --- | --- |
@@ -288,15 +302,20 @@ Content-Type: application/json
 | FPR | TBD | test、golden set |
 | 延遲 p95（本機，單筆 request） | TBD | 固定 fixture |
 | 量化後指標最大退步 | TBD | test |
+| 可容忍退步 τ（成對比較） | TBD | test |
 
 ## 待 owner 決定的問題
 
-- Q1. 任務範圍：第一輪只做 prompt injection / jailbreak 二元偵測，可以嗎？jailbreak 是否併入 `injection` 標籤？
-- Q2. Base model：Qwen 0.5B 級或 SmolLM2-360M 級，或其他？是否需要良好的 zh-TW 能力作為硬性條件？
+- Q1.（已回答 2026-11-14）第一輪只做 prompt injection / jailbreak 二元偵測；jailbreak 併入 `injection` 標籤。
+- Q2.（已回答 2026-11-14）M2 用 PyTorch encoder 分類器，M3 用 PyTorch 加 PEFT 的 LoRA，MLX-LM 當備案。具體模型在 model-selection 步驟決定。zh-TW 能力是否為硬性條件，仍待決定。
 - Q3. 雲端 provider：staging 與 prod 用哪一家？是否必須在免費額度內？
-- Q4. 門檻：precision、recall、FPR、p95 延遲的目標值；資料與模型可用的磁碟上限（目前約 26 GB 可用）。
+- Q4.（延到 M2 之後）門檻：precision、recall、FPR、p95 延遲、τ 的目標值；資料與模型可用的磁碟上限（2026-11-14 約 42 GB 可用）。
 - Q5. 監控隱私：prod log 是否可以保存原始輸入文字，或只保存 hash？
 - Q6. 是否在 M2 加入一個現成 guard model 作為參考對照？
+
+## 階段範圍
+
+第一階段做 M1–M4，目標日為 2026-11-22。M5–M9 排在第一階段之後。
 
 ## Non-goals
 
