@@ -1,6 +1,6 @@
 # Spec 0003: M1 資料管線（data pipeline）
 
-Status: Draft（awaiting owner review）
+Status: Accepted（owner 於 2026-11-14 接受；Q1–Q4 已回答）
 Date: 2026-11-14
 Traceability: enforced（gate 腳本在 M7 才移植；在那之前由 verifier 逐項檢查）
 Builds on: Spec 0001（路線圖，R1.1–R1.6）、Spec 0002（walking skeleton）
@@ -75,7 +75,7 @@ Golden set 的一筆（人工撰寫）：
 
 查詢日期 2026-11-14。筆數與授權取自 Hub API 與 dataset card。
 
-### 採用（proposed）
+### 採用
 
 | Source | 用途 | 授權（card 所述） | 筆數 | 語言 | 備註 |
 | --- | --- | --- | --- | --- | --- |
@@ -191,12 +191,12 @@ Golden set 的一筆（人工撰寫）：
 - **中文是機器翻譯。** 經 OpenCC 轉換後仍是中國用語。它不能代表台灣使用者的寫法。Golden set 是唯一的 zh-TW 原生資料。
 - **Share-alike 授權。** `databricks/databricks-dolly-15k` 是 `cc-by-sa-3.0`。本專案不重新散布資料檔。訓練出的模型權重是否受 share-alike 約束，沒有定論；公開模型權重前需要另行確認。
 
-## 待 owner 決定的問題
+## Owner 的決定（2026-11-14）
 
-- **Q1.** 資料來源採用上表五個，`neuralchemy/Prompt-injection-dataset` 先不用，可以嗎？
-- **Q2.** Golden set 由 agent 起草 100 筆，owner 逐筆審查後才提交，可以嗎？
-- **Q3.** zh-TW 是硬性條件嗎？若是，R1.13 中 zh-TW golden set 的結果不佳會擋下 M1；若不是，只記錄不擋。
-- **Q4.** 可以接受 Dolly 的 share-alike 授權用於訓練嗎？公開模型權重前會再確認一次。
+- **Q1.** 資料來源採用上表五個。`neuralchemy/Prompt-injection-dataset` 先不用。
+- **Q2.** Golden set 由 agent 起草 100 筆。Owner 逐筆審查後才提交。審查前的草稿只用於暫時量測，結果標為 provisional。
+- **Q3.** zh-TW 不是硬性條件。R1.13 中 zh-TW 的結果只記錄，不擋 M1。
+- **Q4.** 接受 `databricks/databricks-dolly-15k` 的 share-alike 授權用於訓練。公開模型權重前再確認一次。
 
 ## Non-goals
 
