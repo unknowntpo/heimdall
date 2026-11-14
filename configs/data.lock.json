@@ -1,0 +1,166 @@
+{
+  "spec": "docs/specs/0003-m1-data-pipeline.md",
+  "sources": {
+    "deepset/prompt-injections": {
+      "revision": "4f61ecb038e9c3fb77e21034b22511b523772cdd",
+      "license": "apache-2.0 (card front matter; dataset_info block says cc-by-4.0)",
+      "raw_rows": 662,
+      "rows_after_normalise": 662
+    },
+    "jackhhao/jailbreak-classification": {
+      "revision": "2f2ceeb39658696fd3f462403562b6eea5306287",
+      "license": "apache-2.0",
+      "raw_rows": 1306,
+      "rows_after_normalise": 1306
+    },
+    "Lakera/gandalf_ignore_instructions": {
+      "revision": "04737b65e90a6794ec227012e4a255a7def6344b",
+      "license": "mit",
+      "raw_rows": 1000,
+      "rows_after_normalise": 1000
+    },
+    "databricks/databricks-dolly-15k": {
+      "revision": "bdd27f4d94b9c1f951818a7da7fd7aeea5dbff1a",
+      "license": "cc-by-sa-3.0",
+      "raw_rows": 15011,
+      "rows_after_normalise": 3000
+    },
+    "rikka-snow/prompt-injection-multilingual": {
+      "revision": "f1ad1f3dd44581f53a4c67e96a9dde2fb419ee5b",
+      "license": "mit",
+      "raw_rows": 7282,
+      "rows_after_normalise": 662
+    }
+  },
+  "dropped_sources": [],
+  "golden_rows_sha256": "e2deb3bad49f4032065aba9628d3dae1971ad2fc847596d2d1fe4a2431a54baf",
+  "removed": {
+    "input_rows": 6630,
+    "exact_removed": 87,
+    "exact_contradiction_groups": 0,
+    "exact_contradiction_rows": 0,
+    "near_removed": 145,
+    "near_contradiction_groups": 0,
+    "near_contradiction_rows": 0,
+    "contradiction_groups": 0,
+    "contradiction_rows": 0,
+    "orphan_translations_dropped": 0,
+    "cross_split": {
+      "train_vs_val_test": 0,
+      "val_vs_test": 0
+    },
+    "golden_vs_train": 0
+  },
+  "splits": {
+    "train": {
+      "rows": 4263,
+      "labels": {
+        "safe": 3028,
+        "injection": 1235
+      },
+      "sha256": "2dfea6c10f1de4aacd288b0cec8d4276c1857834c0482ee10753ab4d76befe5b"
+    },
+    "val": {
+      "rows": 1104,
+      "labels": {
+        "safe": 661,
+        "injection": 443
+      },
+      "sha256": "bdb70f20fce71ea355eb9abf291db565c78a6b961ad2da0ffde3b84f33b00b69"
+    },
+    "test": {
+      "rows": 1031,
+      "labels": {
+        "safe": 673,
+        "injection": 358
+      },
+      "sha256": "3dcf4b812e5f205f991f91cfa61e74a1ac55e15c5f845800f982e0c6bb0849f7"
+    }
+  },
+  "stats": {
+    "train": {
+      "by_label": {
+        "injection": 1235,
+        "safe": 3028
+      },
+      "by_source": {
+        "Lakera/gandalf_ignore_instructions|injection": 614,
+        "databricks/databricks-dolly-15k|safe": 2071,
+        "deepset/prompt-injections|injection": 149,
+        "deepset/prompt-injections|safe": 278,
+        "jackhhao/jailbreak-classification|injection": 335,
+        "jackhhao/jailbreak-classification|safe": 422,
+        "rikka-snow/prompt-injection-multilingual|injection": 137,
+        "rikka-snow/prompt-injection-multilingual|safe": 257
+      },
+      "by_lang": {
+        "de|injection": 46,
+        "de|safe": 108,
+        "en|injection": 1052,
+        "en|safe": 2663,
+        "zh-Hant|injection": 137,
+        "zh-Hant|safe": 257
+      },
+      "median_chars": {
+        "safe": 56.0,
+        "injection": 92
+      }
+    },
+    "val": {
+      "by_label": {
+        "injection": 443,
+        "safe": 661
+      },
+      "by_source": {
+        "Lakera/gandalf_ignore_instructions|injection": 272,
+        "databricks/databricks-dolly-15k|safe": 445,
+        "deepset/prompt-injections|injection": 46,
+        "deepset/prompt-injections|safe": 64,
+        "jackhhao/jailbreak-classification|injection": 82,
+        "jackhhao/jailbreak-classification|safe": 93,
+        "rikka-snow/prompt-injection-multilingual|injection": 43,
+        "rikka-snow/prompt-injection-multilingual|safe": 59
+      },
+      "by_lang": {
+        "de|injection": 14,
+        "de|safe": 25,
+        "en|injection": 386,
+        "en|safe": 577,
+        "zh-Hant|injection": 43,
+        "zh-Hant|safe": 59
+      },
+      "median_chars": {
+        "safe": 58,
+        "injection": 77
+      }
+    },
+    "test": {
+      "by_label": {
+        "injection": 358,
+        "safe": 673
+      },
+      "by_source": {
+        "Lakera/gandalf_ignore_instructions|injection": 112,
+        "databricks/databricks-dolly-15k|safe": 440,
+        "deepset/prompt-injections|injection": 59,
+        "deepset/prompt-injections|safe": 56,
+        "jackhhao/jailbreak-classification|injection": 128,
+        "jackhhao/jailbreak-classification|safe": 123,
+        "rikka-snow/prompt-injection-multilingual|injection": 59,
+        "rikka-snow/prompt-injection-multilingual|safe": 54
+      },
+      "by_lang": {
+        "de|injection": 20,
+        "de|safe": 20,
+        "en|injection": 279,
+        "en|safe": 599,
+        "zh-Hant|injection": 59,
+        "zh-Hant|safe": 54
+      },
+      "median_chars": {
+        "safe": 63,
+        "injection": 131.0
+      }
+    }
+  }
+}

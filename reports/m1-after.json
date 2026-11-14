@@ -1,0 +1,333 @@
+{
+  "name": "m1-after",
+  "git_commit": "f7841e5f1efd41ed0782c7b99cc4d43c7c91f79a",
+  "test_file": "data/test.jsonl",
+  "test_sha256": "3dcf4b812e5f205f991f91cfa61e74a1ac55e15c5f845800f982e0c6bb0849f7",
+  "n_test": 1031,
+  "golden_file": "golden/zh-tw.jsonl",
+  "golden_sha256": "986ccf4c66cb5c830b66fcedd8ca35d0ac5dc846ce5054a1cbf7a2cdd483cca3",
+  "n_golden": 100,
+  "golden_status": "provisional, too-small (unreviewed draft; 50 rows per label)",
+  "positive_class": "injection",
+  "latency": "single request, wall clock per call incl. tokenisation, after 3 warm-up calls",
+  "models": {
+    "keyword": {
+      "model_version": "heimdall-keyword-0.0.1",
+      "threshold": 0.5,
+      "device": "cpu",
+      "metrics": {
+        "tp": 147,
+        "fp": 10,
+        "fn": 211,
+        "tn": 663,
+        "precision": 0.9363057324840764,
+        "recall": 0.4106145251396648,
+        "f1": 0.570873786407767,
+        "fpr": 0.014858841010401188,
+        "latency_ms_p50": 0.011458061635494232,
+        "latency_ms_p95": 0.2607919741421938
+      },
+      "test_by_lang": {
+        "de": {
+          "n": 40,
+          "tp": 0,
+          "fp": 0,
+          "fn": 20,
+          "tn": 20,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "fpr": 0.0
+        },
+        "en": {
+          "n": 878,
+          "tp": 142,
+          "fp": 10,
+          "fn": 137,
+          "tn": 589,
+          "precision": 0.9342105263157895,
+          "recall": 0.5089605734767025,
+          "f1": 0.6589327146171694,
+          "fpr": 0.01669449081803005
+        },
+        "zh-Hant": {
+          "n": 113,
+          "tp": 5,
+          "fp": 0,
+          "fn": 54,
+          "tn": 54,
+          "precision": 1.0,
+          "recall": 0.0847457627118644,
+          "f1": 0.15625,
+          "fpr": 0.0
+        }
+      },
+      "golden": {
+        "tp": 16,
+        "fp": 4,
+        "fn": 34,
+        "tn": 46,
+        "precision": 0.8,
+        "recall": 0.32,
+        "f1": 0.45714285714285713,
+        "fpr": 0.08,
+        "benign_imperative": {
+          "n": 30,
+          "fp": 1,
+          "fpr": 0.03333333333333333
+        },
+        "by_category": {
+          "benign-imperative": {
+            "n": 30,
+            "tp": 0,
+            "fp": 1,
+            "fn": 0,
+            "tn": 29,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "fpr": 0.03333333333333333
+          },
+          "benign-question": {
+            "n": 10,
+            "tp": 0,
+            "fp": 0,
+            "fn": 0,
+            "tn": 10,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "fpr": 0.0
+          },
+          "benign-security-topic": {
+            "n": 10,
+            "tp": 0,
+            "fp": 3,
+            "fn": 0,
+            "tn": 7,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "fpr": 0.3
+          },
+          "direct-override": {
+            "n": 15,
+            "tp": 3,
+            "fp": 0,
+            "fn": 12,
+            "tn": 0,
+            "precision": 1.0,
+            "recall": 0.2,
+            "f1": 0.33333333333333337,
+            "fpr": 0.0
+          },
+          "indirect": {
+            "n": 10,
+            "tp": 7,
+            "fp": 0,
+            "fn": 3,
+            "tn": 0,
+            "precision": 1.0,
+            "recall": 0.7,
+            "f1": 0.8235294117647058,
+            "fpr": 0.0
+          },
+          "jailbreak-roleplay": {
+            "n": 10,
+            "tp": 3,
+            "fp": 0,
+            "fn": 7,
+            "tn": 0,
+            "precision": 1.0,
+            "recall": 0.3,
+            "f1": 0.4615384615384615,
+            "fpr": 0.0
+          },
+          "obfuscated": {
+            "n": 5,
+            "tp": 1,
+            "fp": 0,
+            "fn": 4,
+            "tn": 0,
+            "precision": 1.0,
+            "recall": 0.2,
+            "f1": 0.33333333333333337,
+            "fpr": 0.0
+          },
+          "prompt-extraction": {
+            "n": 10,
+            "tp": 2,
+            "fp": 0,
+            "fn": 8,
+            "tn": 0,
+            "precision": 1.0,
+            "recall": 0.2,
+            "f1": 0.33333333333333337,
+            "fpr": 0.0
+          }
+        }
+      }
+    },
+    "encoder": {
+      "model_version": "heimdall-spike-encoder-e3",
+      "base_model": "distilbert/distilbert-base-multilingual-cased",
+      "encoder_dir": "artifacts/encoder",
+      "n_train": 4263,
+      "threshold": 0.8627539873123169,
+      "threshold_source": "val (max F1)",
+      "device": "mps",
+      "metrics": {
+        "tp": 341,
+        "fp": 2,
+        "fn": 17,
+        "tn": 671,
+        "precision": 0.9941690962099126,
+        "recall": 0.952513966480447,
+        "f1": 0.9728958630527819,
+        "fpr": 0.0029717682020802376,
+        "latency_ms_p50": 6.810042075812817,
+        "latency_ms_p95": 15.544624999165535
+      },
+      "test_by_lang": {
+        "de": {
+          "n": 40,
+          "tp": 20,
+          "fp": 0,
+          "fn": 0,
+          "tn": 20,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "fpr": 0.0
+        },
+        "en": {
+          "n": 878,
+          "tp": 266,
+          "fp": 1,
+          "fn": 13,
+          "tn": 598,
+          "precision": 0.9962546816479401,
+          "recall": 0.953405017921147,
+          "f1": 0.9743589743589743,
+          "fpr": 0.001669449081803005
+        },
+        "zh-Hant": {
+          "n": 113,
+          "tp": 55,
+          "fp": 1,
+          "fn": 4,
+          "tn": 53,
+          "precision": 0.9821428571428571,
+          "recall": 0.9322033898305084,
+          "f1": 0.9565217391304348,
+          "fpr": 0.018518518518518517
+        }
+      },
+      "golden": {
+        "tp": 50,
+        "fp": 26,
+        "fn": 0,
+        "tn": 24,
+        "precision": 0.6578947368421053,
+        "recall": 1.0,
+        "f1": 0.7936507936507937,
+        "fpr": 0.52,
+        "benign_imperative": {
+          "n": 30,
+          "fp": 21,
+          "fpr": 0.7
+        },
+        "by_category": {
+          "benign-imperative": {
+            "n": 30,
+            "tp": 0,
+            "fp": 21,
+            "fn": 0,
+            "tn": 9,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "fpr": 0.7
+          },
+          "benign-question": {
+            "n": 10,
+            "tp": 0,
+            "fp": 1,
+            "fn": 0,
+            "tn": 9,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "fpr": 0.1
+          },
+          "benign-security-topic": {
+            "n": 10,
+            "tp": 0,
+            "fp": 4,
+            "fn": 0,
+            "tn": 6,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "fpr": 0.4
+          },
+          "direct-override": {
+            "n": 15,
+            "tp": 15,
+            "fp": 0,
+            "fn": 0,
+            "tn": 0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "fpr": 0.0
+          },
+          "indirect": {
+            "n": 10,
+            "tp": 10,
+            "fp": 0,
+            "fn": 0,
+            "tn": 0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "fpr": 0.0
+          },
+          "jailbreak-roleplay": {
+            "n": 10,
+            "tp": 10,
+            "fp": 0,
+            "fn": 0,
+            "tn": 0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "fpr": 0.0
+          },
+          "obfuscated": {
+            "n": 5,
+            "tp": 5,
+            "fp": 0,
+            "fn": 0,
+            "tn": 0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "fpr": 0.0
+          },
+          "prompt-extraction": {
+            "n": 10,
+            "tp": 10,
+            "fp": 0,
+            "fn": 0,
+            "tn": 0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "fpr": 0.0
+          }
+        }
+      }
+    }
+  }
+}
