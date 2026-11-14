@@ -1,4 +1,4 @@
-"""`heimdall` command line: data, train, eval, guard."""
+"""`heimdall` command line: data, train, evaluate, guard."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ def main(argv: list[str] | None = None) -> int:
     t.add_argument("--batch-size", type=int, default=16)
     t.add_argument("--lr", type=float, default=5e-5)
     t.add_argument("--cpu", action="store_true", help="force CPU")
-    e = sub.add_parser("eval", help="evaluate keyword + encoder on test")
+    e = sub.add_parser("evaluate", help="evaluate keyword + encoder on test")
     e.add_argument("--name", default="walking-skeleton")
     g = sub.add_parser("guard", help="classify one text")
     g.add_argument("text")
@@ -29,7 +29,7 @@ def main(argv: list[str] | None = None) -> int:
     elif args.cmd == "train":
         from heimdall.encoder import train
         train(args.epochs, args.batch_size, args.lr, args.cpu)
-    elif args.cmd == "eval":
+    elif args.cmd == "evaluate":
         from heimdall.evaluate import evaluate
         try:
             evaluate(args.name)

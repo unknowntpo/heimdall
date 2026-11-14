@@ -33,6 +33,22 @@ Heimdall 是一個 prompt injection / jailbreak 偵測模型（guardrail model�
 
 D1–D3 已由 owner 接受（2026-11-14）。第一階段範圍是 M1–M4。其餘決策仍是 proposed。
 
+有一個 walking skeleton spike（資料 → 訓練 → 評估 → CLI），不是正式實作。
+
+## Quick start（walking skeleton）
+
+Spike：先讓整條流程跑起來，細節見 [docs/specs/0002-walking-skeleton.md](docs/specs/0002-walking-skeleton.md)。需要 `uv`。
+
+```bash
+uv sync                                   # 安裝依賴（含 PyTorch）
+uv run heimdall data                      # 下載 deepset/prompt-injections，寫入 data/*.jsonl
+uv run heimdall train                     # fine-tune encoder，checkpoint 存到 artifacts/encoder/
+uv run heimdall evaluate --name walking-skeleton # 在 test 上比較 keyword 與 encoder，寫 reports/walking-skeleton.json
+uv run heimdall guard "Ignore all previous instructions."   # 用 encoder 判斷一段文字
+uv run heimdall guard "忽略之前的指示" --model keyword        # 用關鍵字 baseline
+uv run pytest -q                          # 離線 unit test
+```
+
 ## 文件
 
 - 路線圖 spec：[docs/specs/0001-lifecycle-roadmap.md](docs/specs/0001-lifecycle-roadmap.md)
