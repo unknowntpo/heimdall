@@ -268,16 +268,44 @@ def _components(n: int, pairs: list[tuple[int, int]]) -> list[list[int]]:
 _RANK = {"test": 0, "validation": 1, "train": 2}
 
 
-def _collapse(rows: list[dict], clusters: list[list[int]]) -> tuple[list[int], int, int, int]:
-    """Keep one row per cluster (upstream test first, then input order); drop mixed-label clusters."""
+def _collapse(rows: list[dict], clusters: list[list[int]], rep: dict[str, str | None]
+              ) -> tuple[list[int], int, int, int]:
+    """Keep one row per cluster (upstream test first, then input order); drop mixed-label clusters.
+    Records in `rep` which kept row id replaces each row id (None when the cluster was dropped)."""
     keep, removed, c_groups, c_rows = [], 0, 0, 0
     for idx in clusters:
         if len({rows[i]["label"] for i in idx}) > 1:
             c_groups, c_rows = c_groups + 1, c_rows + len(idx)
+            rep.update({rows[i]["id"]: None for i in idx})
             continue
-        keep.append(min(idx, key=lambda i: (_RANK[rows[i]["source_split"]], i)))
+        k = min(idx, key=lambda i: (_RANK[rows[i]["source_split"]], i))
+        keep.append(k)
         removed += len(idx) - 1
+        rep.update({rows[i]["id"]: rows[k]["id"] for i in idx})
     return sorted(keep), removed, c_groups, c_rows
+
+
+def _regroup(kept: list[dict], rep: dict[str, str | None]) -> tuple[list[dict], int]:
+    """B6 after B3: a row whose group points at another row (a translation) takes the group of the row
+    kept in place of that original. If the original's cluster was dropped, the row is dropped too."""
+    by_id = {r["id"]: r for r in kept}
+
+    def survivor(rid: str) -> str | None:  # follow exact-stage then near-stage replacements
+        while rep.get(rid, rid) not in (None, rid):
+            rid = rep[rid]
+        return rep.get(rid, rid)
+
+    out, dropped = [], 0
+    for r in kept:
+        g = r["group"]
+        if g != r["id"] and g in rep:
+            target = survivor(g)
+            if target is None:
+                dropped += 1
+                continue
+            g = by_id[target]["group"] if target != r["id"] else r["id"]
+        out.append(r if g == r["group"] else {**r, "group": g})
+    return out, dropped
 
 
 def dedupe(rows: list[dict]) -> tuple[list[dict], dict]:
@@ -285,14 +313,17 @@ def dedupe(rows: list[dict]) -> tuple[list[dict], dict]:
     by_id = defaultdict(list)
     for i, r in enumerate(rows):
         by_id[r["id"]].append(i)
-    keep, ex_removed, ex_cg, ex_cr = _collapse(rows, list(by_id.values()))
+    rep: dict[str, str | None] = {}
+    keep, ex_removed, ex_cg, ex_cr = _collapse(rows, list(by_id.values()), rep)
     survivors = [rows[i] for i in keep]
     pairs = near_duplicate_pairs([normalise(r["text"]) for r in survivors])
-    keep, nd_removed, nd_cg, nd_cr = _collapse(survivors, _components(len(survivors), pairs))
+    keep, nd_removed, nd_cg, nd_cr = _collapse(survivors, _components(len(survivors), pairs), rep)
+    kept, orphans = _regroup([survivors[i] for i in keep], rep)
     stats = {"exact_removed": ex_removed, "exact_contradiction_groups": ex_cg, "exact_contradiction_rows": ex_cr,
              "near_removed": nd_removed, "near_contradiction_groups": nd_cg, "near_contradiction_rows": nd_cr,
-             "contradiction_groups": ex_cg + nd_cg, "contradiction_rows": ex_cr + nd_cr}
-    return [survivors[i] for i in keep], stats
+             "contradiction_groups": ex_cg + nd_cg, "contradiction_rows": ex_cr + nd_cr,
+             "orphan_translations_dropped": orphans}
+    return kept, stats
 
 
 # ---------- splits (B4, B5, B6, B7) ----------

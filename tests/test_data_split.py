@@ -130,3 +130,34 @@ def test_R1_10_unverifiable_alignment_drops_the_translation_source():
     broken = {k: list(v) for k, v in raws["fixture/translated"].items()}
     broken["train"][0] = {"text": "this is not the original row", "label": 1}  # block 0 no longer matches
     assert normalise_source(sources["fixture/translated"], broken, raws) == []
+
+
+def _orphan_case(orig_label="injection"):
+    """A train original removed by B3 as a near-duplicate of an upstream-test row, plus its translation."""
+    from heimdall.data import dedupe
+
+    for i in range(100):  # pick a group whose own hash would NOT send it to test
+        t = hex_text("orphan", i)
+        orig = make_row(t, orig_label, "fixture/base", "train", "en")
+        if orig["group"] in {r["group"] for r in assign_splits([orig], three_way=set())["train"]}:
+            break
+    keeper = make_row(t + "!", "injection", "fixture/attacks", "test", "en")
+    trans = make_row(hex_text("orphan-zh", i), orig_label, "fixture/translated", "train", "zh-Hant",
+                     group=orig["group"])
+    kept, stats = dedupe([orig, trans, keeper])
+    return assign_splits(kept, three_way=set()), stats, trans
+
+
+def test_R1_10_translation_follows_the_kept_test_row_when_its_original_was_removed():
+    out, _, trans = _orphan_case()
+    where = {r["text"]: s for s, rs in out.items() for r in rs}
+    assert where[trans["text"]] == "test"
+    assert not out["train"] and not out["val"]
+    check_no_leakage(out)
+
+
+def test_R1_10_translation_is_dropped_when_its_original_cluster_is_a_contradiction():
+    out, stats, trans = _orphan_case(orig_label="safe")  # original safe vs kept-test injection -> both removed
+    assert stats["contradiction_groups"] == 1
+    assert all(r["text"] != trans["text"] for rs in out.values() for r in rs)
+    assert stats["orphan_translations_dropped"] == 1
