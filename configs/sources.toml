@@ -1,0 +1,76 @@
+# M1 data sources (Spec 0003, B1). Only datasets listed here are downloaded.
+# Revisions are Hub commit shas, looked up with the Hub API on 2026-11-14.
+# Licences are as stated on each dataset card at that revision.
+#
+# Keys: id, revision, license, allowed, use, format (parquet|csv|jsonl), files (upstream split -> path),
+# text (column), label + label_map or fixed_label, lang ("detect-en-de" = stop-word heuristic),
+# optional sample (deterministic: smallest ids), split_by_hash ([train, val] default, or [train, val, test]),
+# translation_of + translation_block + opencc for row-aligned translations (B6).
+
+[[source]]
+id = "deepset/prompt-injections"
+revision = "4f61ecb038e9c3fb77e21034b22511b523772cdd"
+license = "apache-2.0 (card front matter; dataset_info block says cc-by-4.0)"
+allowed = true
+use = "positives and negatives"
+format = "parquet"
+files = { train = "data/train-00000-of-00001-9564e8b05b4757ab.parquet", test = "data/test-00000-of-00001-701d16158af87368.parquet" }
+text = "text"
+label = "label"
+label_map = { "0" = "safe", "1" = "injection" }
+lang = "detect-en-de"
+
+[[source]]
+id = "jackhhao/jailbreak-classification"
+revision = "2f2ceeb39658696fd3f462403562b6eea5306287"
+license = "apache-2.0"
+allowed = true
+use = "positives and negatives (balanced config: train 1044, test 262)"
+format = "csv"
+files = { train = "balanced/jailbreak_dataset_train_balanced.csv", test = "balanced/jailbreak_dataset_test_balanced.csv" }
+text = "prompt"
+label = "type"
+label_map = { "benign" = "safe", "jailbreak" = "injection" }
+lang = "en"
+
+[[source]]
+id = "Lakera/gandalf_ignore_instructions"
+revision = "04737b65e90a6794ec227012e4a255a7def6344b"
+license = "mit"
+allowed = true
+use = "positives only"
+format = "parquet"
+files = { train = "data/train-00000-of-00001-ded53be747ff55cd.parquet", validation = "data/validation-00000-of-00001-94481a2a09ff2fff.parquet", test = "data/test-00000-of-00001-bc92128b9288a6d1.parquet" }
+text = "text"
+fixed_label = "injection"
+lang = "en"
+
+[[source]]
+id = "databricks/databricks-dolly-15k"
+revision = "bdd27f4d94b9c1f951818a7da7fd7aeea5dbff1a"
+license = "cc-by-sa-3.0"
+allowed = true
+use = "hard negatives: the instruction column only, sampled to 3000"
+format = "jsonl"
+files = { train = "databricks-dolly-15k.jsonl" }
+text = "instruction"
+fixed_label = "safe"
+lang = "en"
+sample = 3000
+split_by_hash = ["train", "val", "test"]
+
+[[source]]
+id = "rikka-snow/prompt-injection-multilingual"
+revision = "f1ad1f3dd44581f53a4c67e96a9dde2fb419ee5b"
+license = "mit"
+allowed = true
+use = "zh machine translations of deepset/prompt-injections (block 1 of 11 row-aligned language blocks)"
+format = "parquet"
+files = { train = "data/train-00000-of-00001.parquet", test = "data/test-00000-of-00001.parquet" }
+text = "text"
+label = "label"
+label_map = { "0" = "safe", "1" = "injection" }
+lang = "zh-Hant"
+translation_of = "deepset/prompt-injections"
+translation_block = 1
+opencc = "s2twp"
