@@ -31,20 +31,19 @@
       "raw_rows": 7282,
       "rows_after_normalise": 662
     },
-    "databricks/databricks-dolly-15k#mt-zh-Hant": {
-      "revision": "408d9bc410a388e1d9aef112a2daba955b945255",
-      "license": "cc-by-sa-3.0 (machine translation of databricks/databricks-dolly-15k; MT model Helsinki-NLP/opus-mt-en-zh is apache-2.0 per its model card, checked 2026-11-15)",
+    "databricks/databricks-dolly-15k#zh-Hant": {
+      "derived_from": "databricks/databricks-dolly-15k",
+      "revision": "bdd27f4d94b9c1f951818a7da7fd7aeea5dbff1a",
+      "license": "cc-by-sa-3.0 (translation of databricks/databricks-dolly-15k; see sources/dolly-zh-hant.NOTICE)",
       "raw_rows": 2000,
-      "rows_after_normalise": 2000,
-      "mt": {
-        "model": "Helsinki-NLP/opus-mt-en-zh",
-        "model_revision": "408d9bc410a388e1d9aef112a2daba955b945255",
-        "source_sha256": "621f3fd49e6e4bdb8e866892f3a2a831a415e684f88314a086bde22dcd5e877b",
-        "translated_sha256": "a18b7f42cf43fff39ff14e0aa3feb6ae56a7dd09b7c51c2eb462bc7fadbe3918",
-        "cache_file": "Helsinki-NLP__opus-mt-en-zh@408d9bc410a388e1d9aef112a2daba955b945255-621f3fd49e6e4bdb.jsonl",
+      "rows_after_normalise": 1999,
+      "translation": {
+        "file": "sources/dolly-zh-hant.jsonl",
+        "sha256": "c9a0695b7e033e1a1ff366675a6a238fe3caddc8cd24a9a5201a9db172208eeb",
+        "file_rows": 1948,
         "selected": 2000,
+        "excluded": 1,
         "dropped": {
-          "too_long": 0,
           "empty": 0,
           "identical": 0,
           "no_cjk": 0
@@ -55,8 +54,8 @@
   "dropped_sources": [],
   "golden_rows_sha256": "e2deb3bad49f4032065aba9628d3dae1971ad2fc847596d2d1fe4a2431a54baf",
   "removed": {
-    "input_rows": 8630,
-    "exact_removed": 146,
+    "input_rows": 8629,
+    "exact_removed": 141,
     "exact_contradiction_groups": 0,
     "exact_contradiction_rows": 0,
     "near_removed": 145,
@@ -73,39 +72,39 @@
   },
   "splits": {
     "train": {
-      "rows": 5629,
+      "rows": 5628,
       "labels": {
-        "safe": 4394,
+        "safe": 4393,
         "injection": 1235
       },
-      "sha256": "be088e39d68dfda987ec81923fbf9b5f7d33a0e94e2cbdc25f992de1fd4c8d77"
+      "sha256": "ccb7862d28b50884923f2eb33a2aaac4d01f7b1faf690a584aed10ac7d85c30f"
     },
     "val": {
-      "rows": 1382,
+      "rows": 1407,
       "labels": {
-        "safe": 939,
+        "safe": 964,
         "injection": 443
       },
-      "sha256": "6582b1a6c48f429a1bd2e341463fd2a2d5831d1866d2a8b32eee729902599469"
+      "sha256": "f53e1bad08276946709127d7343bd5c5a69f6412edf553d622d12f5fe5ad4467"
     },
     "test": {
-      "rows": 1328,
+      "rows": 1308,
       "labels": {
-        "safe": 970,
+        "safe": 950,
         "injection": 358
       },
-      "sha256": "9c067105c1bef42627d99ead4d6c01008c1bb54fde4e56f9aa2e013164713720"
+      "sha256": "c4eaefe2e35f829e3950966f388e1d483b9540108448b914108eccd76f9c121b"
     }
   },
   "stats": {
     "train": {
       "by_label": {
         "injection": 1235,
-        "safe": 4394
+        "safe": 4393
       },
       "by_source": {
         "Lakera/gandalf_ignore_instructions|injection": 614,
-        "databricks/databricks-dolly-15k#mt-zh-Hant|safe": 1366,
+        "databricks/databricks-dolly-15k#zh-Hant|safe": 1365,
         "databricks/databricks-dolly-15k|safe": 2071,
         "deepset/prompt-injections|injection": 149,
         "deepset/prompt-injections|safe": 278,
@@ -120,21 +119,21 @@
         "en|injection": 1052,
         "en|safe": 2663,
         "zh-Hant|injection": 137,
-        "zh-Hant|safe": 1623
+        "zh-Hant|safe": 1622
       },
       "median_chars": {
-        "safe": 39.5,
+        "safe": 42,
         "injection": 92
       }
     },
     "val": {
       "by_label": {
         "injection": 443,
-        "safe": 939
+        "safe": 964
       },
       "by_source": {
         "Lakera/gandalf_ignore_instructions|injection": 272,
-        "databricks/databricks-dolly-15k#mt-zh-Hant|safe": 278,
+        "databricks/databricks-dolly-15k#zh-Hant|safe": 303,
         "databricks/databricks-dolly-15k|safe": 445,
         "deepset/prompt-injections|injection": 46,
         "deepset/prompt-injections|safe": 64,
@@ -149,21 +148,21 @@
         "en|injection": 386,
         "en|safe": 577,
         "zh-Hant|injection": 43,
-        "zh-Hant|safe": 337
+        "zh-Hant|safe": 362
       },
       "median_chars": {
-        "safe": 43,
+        "safe": 44.0,
         "injection": 77
       }
     },
     "test": {
       "by_label": {
         "injection": 358,
-        "safe": 970
+        "safe": 950
       },
       "by_source": {
         "Lakera/gandalf_ignore_instructions|injection": 112,
-        "databricks/databricks-dolly-15k#mt-zh-Hant|safe": 297,
+        "databricks/databricks-dolly-15k#zh-Hant|safe": 277,
         "databricks/databricks-dolly-15k|safe": 440,
         "deepset/prompt-injections|injection": 59,
         "deepset/prompt-injections|safe": 56,
@@ -178,10 +177,10 @@
         "en|injection": 279,
         "en|safe": 599,
         "zh-Hant|injection": 59,
-        "zh-Hant|safe": 351
+        "zh-Hant|safe": 331
       },
       "median_chars": {
-        "safe": 42.5,
+        "safe": 45.0,
         "injection": 131.0
       }
     }
