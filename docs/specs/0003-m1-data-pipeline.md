@@ -1,6 +1,6 @@
 # Spec 0003: M1 資料管線（data pipeline）
 
-Status: Accepted（owner 於 2026-11-14 接受；Q1–Q4 已回答）。2026-11-15 修訂：加入 Dolly 的機器翻譯負例（Q5，B12–B13，R1.14–R1.21）
+Status: Accepted（owner 於 2026-11-14 接受；Q1–Q4 已回答）。2026-11-15 修訂：加入 Dolly 指令句的正體中文翻譯作為負例（Q5、Q6，B12–B13，R1.14–R1.21）
 Date: 2026-11-14（修訂 2026-11-15）
 Traceability: enforced（gate 腳本在 M7 才移植；在那之前由 verifier 逐項檢查）
 Builds on: Spec 0001（路線圖，R1.1–R1.6）、Spec 0002（walking skeleton）
@@ -50,9 +50,9 @@ Owner 需要一份訓練資料與測試資料，讓模型學到「惡意意圖�
 | golden set | 人工撰寫、人工標註的固定測試集。不來自任何 source，不參與訓練，也不用來選 threshold。 |
 | OpenCC | 開源的中文簡繁轉換工具。`s2twp` 設定會把簡體轉成台灣正體並替換常用詞。 |
 | lock file | 已提交的 JSON 檔，記錄每個 source 的 revision 與每個輸出檔的筆數和 sha256。 |
-| MT（machine translation，機器翻譯） | 用翻譯模型把一段文字自動譯成另一種語言。本 spec 只用本機執行的開源模型。 |
-| derived source（衍生 source） | 不從 Hub 下載資料、而是由設定檔中前面一個 source 的列經 MT 產生的 source。它的 `revision` 是 MT 模型的 commit sha。 |
-| MT cache | MT 輸出的快取檔，放在不提交的 `data/mt-cache/`，檔名由 MT 模型 revision 與原文內容的 hash 決定。 |
+| translator（翻譯者） | 把已授權、人工撰寫的文字譯成另一種語言的程式或模型。只翻譯，不回答、不改寫、不生成新的樣本。 |
+| derived source（衍生 source） | 不從 Hub 下載資料，而是把已提交的翻譯檔接到設定檔中前面一個 source 的列上的 source。它沒有 Hub revision，以 lock file 中翻譯檔的 sha256 固定內容。 |
+| `source_sha256` | 英文原文（UTF-8，不做 normalise）的 sha256。翻譯檔用它對應到原文，不存英文原文。 |
 
 ## Example
 
@@ -94,7 +94,7 @@ Golden set 的一筆（人工撰寫）：
 | `Lakera/gandalf_ignore_instructions` | 只有正例 | `mit` | train 777、validation 111、test 112 | en | 全部是「忽略指示」類攻擊，彼此相似度高。 |
 | `databricks/databricks-dolly-15k` | 只有負例（hard negative） | `cc-by-sa-3.0`（share-alike） | train 15011，取樣 3000 | en | 人工撰寫的指令。只取 `instruction` 欄位。 |
 | `rikka-snow/prompt-injection-multilingual`（只取 zh） | 中文正例與負例 | `mit` | zh 筆數待實作時量測 | zh-Hans，經 OpenCC `s2twp` 轉換 | 它是 `deepset/prompt-injections` 的機器翻譯。必須與原文同 split（B6）。 |
-| `databricks/databricks-dolly-15k#mt-zh-Hant`（derived source，2026-11-15 加入） | 只有負例（中文 hard negative） | 資料：`cc-by-sa-3.0`（翻譯是 Dolly 的衍生作品）；MT 模型 `Helsinki-NLP/opus-mt-en-zh`：`apache-2.0`（model card front matter，revision `408d9bc410a388e1d9aef112a2daba955b945255`） | Dolly 中 `id` 排在前 3000 筆之後的 2000 筆 | zh-Hans（MT 輸出）經 OpenCC `s2twp` 轉換，標為 `zh-Hant` | 只翻譯 `instruction` 欄位。不與任何英文列配對（見 B12）。 |
+| `databricks/databricks-dolly-15k#zh-Hant`（derived source，2026-11-15 加入） | 只有負例（中文 hard negative） | `cc-by-sa-3.0`（翻譯是 Dolly 的衍生作品，授權聲明在 `sources/dolly-zh-hant.NOTICE`） | Dolly 中 `id` 排在前 3000 筆之後的 2000 筆（1949 種不同文字）；翻譯檔 1948 列 | zh-Hant（translator 直接輸出台灣正體） | 只翻譯 `instruction`。翻譯檔 `sources/dolly-zh-hant.jsonl` 已提交。不與任何英文列配對（見 B12）。 |
 
 依上游 test split 估算，test 的正例至少 60 + 139 + 112 = 311 筆，負例至少 56 + 123 = 179 筆，再加 Dolly 取樣中分到 test 的部分。去重後的實際筆數由 R1.6 量測，R1.8 把關。
 
@@ -122,8 +122,9 @@ Golden set 的一筆（人工撰寫）：
 2. **刪除。**
    - 刪除 `neuralchemy/Prompt-injection-dataset`：不用它，test 也能達到各 300 筆。
    - 刪除 zh-TW 良性問句資料集：它不解決指令句誤報。
-   - 刪除資料增強、改寫、用 LLM 生成樣本。2026-11-15 修訂（Q5）：保留一項例外，把已授權、人工撰寫的 source 做 MT。LLM 生成或改寫仍然刪除。
-   - MT 的 Dolly 列不與英文原文配對（不設 `group`）：原文不在資料集內，沒有 leakage 可防。
+   - 刪除資料增強、改寫、用 LLM 生成樣本。2026-11-15 修訂（Q5、Q6）：保留一項例外，LLM 只能當 translator，翻譯已授權、人工撰寫的 source。LLM 生成或改寫的樣本仍然刪除。
+   - 翻譯的 Dolly 列不與英文原文配對（不設 `group`）：原文不在資料集內，沒有 leakage 可防。
+   - 管線不執行任何翻譯模型。翻譯無法重現（Q6），所以結果以檔案提交，管線只讀檔。
    - 刪除類別平衡的重抽樣。類別比例交給訓練階段處理。
    - 刪除資料版本管理工具（例如 DVC）。Lock file 加 revision pin 已足夠。
 3. **簡化。** 一個命令、一個設定檔、一個 lock file。Split 由 hash 決定，不依賴隨機數狀態。
@@ -143,8 +144,8 @@ Golden set 的一筆（人工撰寫）：
 - **B9 Lock file。** 管線寫出 `configs/data.lock.json`：每個 source 的 revision、每個 split 的筆數、各標籤筆數、檔案 sha256。此檔已提交。資料檔本身不提交。
 - **B10 失敗即停。** 任何 source 下載失敗、revision 不符、授權未記錄或 `allowed = false` 時，管線以非零狀態結束，不寫出任何 split 檔。
 - **B11 最小筆數。** Test 的任一標籤少於 300 筆，或 val 的任一標籤少於 200 筆時，管線以非零狀態結束。
-- **B12 MT 負例（2026-11-15）。** Derived source `databricks/databricks-dolly-15k#mt-zh-Hant` 取 Dolly 中沒有被 Dolly source 取樣的列：依 `id` 排序，跳過前 3000 筆用過的 `id`，取接下來的 2000 筆。只翻譯 `instruction`。MT 模型是 `Helsinki-NLP/opus-mt-en-zh`，以設定檔中的 revision 下載，只在 CPU 執行，解碼固定（beam search，不抽樣）。輸出經 OpenCC `s2twp` 轉換。每一列的 `label` 是 `safe`，`lang` 是 `zh-Hant`，`source_split` 是 `train`，`group` 是自己的 `id`。這些列與其他列一樣經過 B3 去重、B4 三向 hash 切分、B7 與 B8。以下四種翻譯會被移除並分別計數：原文超過 MT 模型的最大輸入長度（不截斷）、翻譯為空、翻譯與原文相同、翻譯不含任何中日韓漢字。
-- **B13 MT cache 與 lock。** MT 輸出寫入 `data/mt-cache/`，檔名由 MT 模型 revision 與原文內容（含解碼設定）的 hash 決定。同一個檔名已存在時不重新翻譯。Lock file 記錄 MT 模型 id 與 revision、原文內容的 sha256、MT 輸出檔的 sha256 與四種移除的筆數。以下情況管線以非零狀態結束，不寫出 split 檔：MT 模型解析出的 revision 與設定不符；同一個模型 revision 與原文 hash 下，MT 輸出檔的 sha256 與既有 lock file 的紀錄不同；cache 檔的原文與這次要翻譯的原文不同。除 Hugging Face Hub 的下載外，不使用任何網路服務或翻譯 API。
+- **B12 翻譯負例（2026-11-15）。** Derived source `databricks/databricks-dolly-15k#zh-Hant` 取 Dolly 中沒有被 Dolly source 取樣的列：依 `id` 排序，跳過前 3000 筆用過的 `id`，取接下來的 2000 筆的 `instruction`。每一筆以 `source_sha256` 對應到 `sources/dolly-zh-hant.jsonl` 的一列 `{"source_sha256", "text"}`。`text` 照原樣使用，不經 OpenCC。每一列的 `label` 是 `safe`，`lang` 是 `zh-Hant`，`source_split` 是 `train`，`group` 是自己的 `id`。這些列與其他列一樣經過 B3 去重、B4 三向 hash 切分、B7 與 B8。以下三種翻譯會被移除並分別計數：空字串、與原文相同、不含任何中日韓漢字。
+- **B13 翻譯檔與 lock。** 翻譯檔一個原文一列，不含英文原文。Lock file 記錄翻譯檔的路徑、sha256、列數、選取筆數、排除筆數與三種移除的筆數。設定檔的 `translation_exclude` 列出刻意不翻譯的 `source_sha256` 與理由。以下情況管線以非零狀態結束，不寫出 split 檔：翻譯檔的 sha256 與既有 lock file 的紀錄不同；某一列格式錯誤或重複；某一列對應不到任何選取的原文；某一筆選取的原文沒有翻譯列，也不在 `translation_exclude`；`translation_exclude` 的項目沒有理由、不是選取的原文，或其實有翻譯列。管線不使用任何翻譯模型或網路服務。
 
 ## Acceptance
 
@@ -176,17 +177,17 @@ Golden set 的一筆（人工撰寫）：
 - **R1.6** [measure] 每個 split、每個標籤、每個 source、每個語言的筆數；去重移除的筆數；文字長度的中位數（依標籤）→ 證據為統計命令的輸出，寫入本 spec。
 - **R1.13** [measure] 重訓前與重訓後的 encoder 在 golden set 上的 precision、recall、FPR，以及 `benign-imperative` 類別的誤報率 → 證據為兩份評估報告。Golden set 每個標籤只有 50 筆，依路線圖 R4.7 只能報告為 `too-small`，不能宣稱統計上的改善。
 
-### MT 負例（2026-11-15，B12–B13）
+### 翻譯負例（2026-11-15，B12–B13）
 
-測試一律注入假的翻譯函式，不連網路，也不載入 MT 模型。
+測試只用 `tmp_path` 中的小型翻譯檔，不連網路。
 
-- **R1.14** 前提為 MT 的 base source 有 N 筆列、取樣 k 筆 → 執行 B12 的選取 → 選出的原文是依 `id` 排序後第 k 筆之後的列，與 base 取樣的 `id` 不重疊；每一列 `label` 是 `safe`、`lang` 是 `zh-Hant`、`group` 是自己的 `id`，且經過 OpenCC 轉換 → 測試（含 base 取樣列作為對照，確認它們不被選取）。
-- **R1.15** 前提為五筆翻譯：超過最大輸入長度、空字串、與原文相同、不含漢字、一筆合法 → 執行管線 → 前四筆被移除，lock file 的四個計數各為 1，合法的一筆留下 → 測試。
-- **R1.16** 前提為同一份設定執行兩次 → 第二次不呼叫翻譯函式，輸出與第一次相同；改變 MT 模型 revision 或原文內容後 → 再次呼叫翻譯函式 → 測試。
-- **R1.17** 前提為翻譯函式回報的模型 revision 與設定不符，或 cache 檔被改動使 sha256 與 lock file 不同，或 cache 檔的原文與這次不同 → 執行管線 → 非零狀態結束，錯誤訊息含該 source 的 id，不寫出 split 檔 → 測試（含未改動的對照，確認會成功）。
-- **R1.18** 前提為含 MT source 的同一份 fixture 與設定 → 執行管線兩次（第二次讀 cache）→ 三份輸出檔與 lock file 的 sha256 相同 → 測試。
-- **R1.19** 前提為一筆 MT 列與另一筆列 near-duplicate，以及大量 MT 列 → 執行去重與切分 → near-duplicate 只留一筆；MT 列依 hash 分到 train、val、test 三者 → 測試。
-- **R1.20** [measure] 選取筆數、四種移除的筆數、每個 split 的 `zh-Hant` 筆數；第一次執行（需要翻譯）與讀 cache 時的執行時間；30 筆依 `id` 排序選出的翻譯樣本供人工檢查 → 證據為命令輸出，寫入本 spec。
+- **R1.14** 前提為 base source 有 N 筆列、取樣 k 筆，以及一份完整的翻譯檔 → 執行管線 → 選出的原文是依 `id` 排序後第 k 筆之後的列，與 base 取樣不重疊；每一列 `label` 是 `safe`、`lang` 是 `zh-Hant`、`group` 是自己的 `id`，`text` 與翻譯檔相同（沒有經過 OpenCC）；翻譯檔只有 `source_sha256` 與 `text` 兩個欄位 → 測試（含 base 取樣列作為對照）。
+- **R1.15** 前提為四筆翻譯：空字串、與原文相同、不含漢字、一筆合法 → 執行管線 → 前三筆被移除，lock file 的三個計數各為 1，合法的一筆留下 → 測試。
+- **R1.16** 前提為翻譯檔少一列、多一列對應不到選取原文的列、有重複或格式錯誤的列 → 執行管線 → 非零狀態結束，錯誤訊息含該 source 的 id，不寫出 split 檔；少的那一列列在 `translation_exclude` 且有理由時成功，並計入排除筆數；`translation_exclude` 沒有理由、不是選取的原文或其實有翻譯列時失敗 → 測試（含完整翻譯檔的對照）。
+- **R1.17** 前提為已寫出 lock file 後翻譯檔被改動 → 執行管線 → 非零狀態結束，錯誤訊息含 sha256，不寫出 split 檔；未改動時成功；derived source 必須指向前面一個有取樣的 source → 測試。
+- **R1.18** 前提為含翻譯 source 的同一份 fixture 與設定 → 執行管線兩次 → 三份輸出檔與 lock file 的 sha256 相同 → 測試。
+- **R1.19** 前提為一筆翻譯列與另一筆列 near-duplicate，以及大量翻譯列 → 執行去重與切分 → near-duplicate 只留一筆；翻譯列依 hash 分到 train、val、test 三者；base source 的取樣不受影響 → 測試。
+- **R1.20** [measure] 選取筆數、排除筆數、三種移除的筆數、每個 split 的 `zh-Hant` 筆數、管線執行時間；30 筆依 `source_sha256` 排序選出的翻譯樣本供人工檢查 → 證據為命令輸出，寫入本 spec。
 - **R1.21** [measure] 用新資料重訓後，test（全部與分語言）的 P、R、F1、FPR；golden set 的 precision、recall、FPR、`benign-imperative` 誤報數（分母 30），以及「請幫我把這段會議紀錄整理成三個重點。」的分數，與重訓前（R1.13 的重訓後 encoder）比較 → 證據為評估報告 `reports/m1-zh-negatives.json`。Golden set 仍是 `provisional`、`too-small`。
 
 ## 量測結果（2026-11-14）
@@ -306,7 +307,7 @@ B7 移除 0 列是預期結果：B3 已在切分前對全部資料做 near-dupli
 | `tests/test_data_sources.py` | R1.2、R1.11 | 無授權；`allowed = false`；全部合法；下載失敗；revision 不符 |
 | `tests/test_data_minimum.py` | R1.8 | 299 筆；300 筆 |
 | `tests/test_golden.py` | R1.5 | Golden set 筆數與類別；與 train 的 near-duplicate |
-| `tests/test_data_mt.py` | R1.14–R1.19 | 選取與 base 取樣不重疊；四種移除各一筆加一筆合法；cache 命中與 key 改變；revision 不符、cache 被改動、cache 原文不同與未改動的對照；執行兩次；MT 列 near-duplicate 與三向切分 |
+| `tests/test_data_translation.py` | R1.14–R1.19 | 選取與 base 取樣不重疊；不經 OpenCC；三種移除各一筆加一筆合法；少列、多列、重複、格式錯誤、`translation_exclude`；翻譯檔被改動與未改動的對照；執行兩次；near-duplicate 與三向切分 |
 | 量測命令 | R1.6、R1.12、R1.13、R1.20、R1.21 | 完整管線；重訓前後的 golden set 評估 |
 
 ## 已知風險
@@ -315,10 +316,12 @@ B7 移除 0 列是預期結果：B3 已在切分前對全部資料做 near-dupli
 - **長度捷徑。** `jackhhao/jailbreak-classification` 的文字遠長於其他來源。模型可能學到「長文就是攻擊」。R1.6 回報各標籤的長度中位數。
 - **Gandalf 資料同質性高。** 近似重複去除後，實際留下的筆數可能遠少於 1000。Test 正例可能因此低於 300，屆時 R1.8 會擋下，需要補來源。
 - **門檻以下的相似列跨 split。** 0.85 的規則以外，仍有跨 split 的相似列。以 commit `30dd865` 的輸出計算，跨 split 且 5-gram Jaccard 在 0.70 以上、低於 0.85 的列對共 59 對（train–val 30、train–test 25、val–test 4）。來源主要是 jackhhao 自身（23 對），其次是 deepset（14）、Dolly（12）、rikka-snow（5）。例如 jackhhao 的「Welcome, (highly) esteemed language model…」模板同時出現在 train 與 test。這些列對 test 的數字有樂觀偏差；是否把門檻降到 0.70 需要 owner 決定。
-- **中文是機器翻譯。** 經 OpenCC 轉換後仍是中國用語。它不能代表台灣使用者的寫法。Golden set 是唯一的 zh-TW 原生資料。
-- **Share-alike 授權。** `databricks/databricks-dolly-15k` 是 `cc-by-sa-3.0`。本專案不重新散布資料檔。訓練出的模型權重是否受 share-alike 約束，沒有定論；公開模型權重前需要另行確認。MT 的 Dolly 列是衍生作品，同樣受 share-alike 約束，MT cache 不提交。
-- **翻譯腔與中國用語（B12）。** MT 輸出是逐字直譯，常有翻譯腔（例如 bullet points 譯成「子彈」）。OpenCC `s2twp` 只換字形與少數常用詞，不會變成台灣使用者的寫法。模型可能學到「翻譯腔是良性」，而不是「指令語氣不是攻擊」。R1.20 的人工樣本用來判斷品質。
-- **類別失衡（B12）。** 新增的 2000 筆全是 `safe`。中文的 `safe` 與 `injection` 比例因此大幅偏向 `safe`，模型可能學到「中文就是良性」，使中文攻擊的 recall 下降。R1.21 分語言回報 recall。
+- **中文是機器翻譯。** `rikka-snow/prompt-injection-multilingual` 經 OpenCC 轉換後仍是中國用語；`sources/dolly-zh-hant.jsonl` 是 LLM 的翻譯。它不能代表台灣使用者的寫法。Golden set 是唯一的 zh-TW 原生資料。
+- **Share-alike 授權。** `databricks/databricks-dolly-15k` 是 `cc-by-sa-3.0`。本專案不重新散布下載的資料檔。例外是 `sources/dolly-zh-hant.jsonl`：它是 Dolly 的衍生作品，以 `cc-by-sa-3.0` 公開，授權與變更說明在 `sources/dolly-zh-hant.NOTICE`。訓練出的模型權重是否受 share-alike 約束，沒有定論；公開模型權重前需要另行確認。
+- **翻譯無法重現（B13）。** LLM 的輸出不能逐字重現，所以翻譯以檔案提交，lock file 固定它的 sha256。重做翻譯會得到不同的檔案，訓練資料也會不同。
+- **翻譯者風格的捷徑（B12）。** 中文正例只來自 `rikka-snow/prompt-injection-multilingual`（另一個 translator 的簡體翻譯經 OpenCC），中文負例大多來自本檔（LLM 直接輸出台灣正體）。模型可能學到「這種翻譯風格或用字是良性」，而不是「指令語氣不是攻擊」。R1.21 分語言回報 recall，但 golden set 太小，無法完全排除這個捷徑。
+- **Dolly 指令多是問句（B12）。** Dolly 的 `instruction` 有很大一部分是問句（例如「什麼是…？」），不是命令句。補到的中文良性命令句少於 2000 筆。
+- **類別失衡（B12）。** 新增的列全是 `safe`。中文的 `safe` 與 `injection` 比例因此大幅偏向 `safe`，模型可能學到「中文就是良性」，使中文攻擊的 recall 下降。R1.21 分語言回報 recall。
 - **Golden set 逐漸變成 dev set。** 2026-11-15 的決定是依 golden set 上 21/30 的結果做出的。Golden set 被反覆用來引導資料決策，已經不再是獨立的測試集。它仍是 `provisional`（owner 未審查）與 `too-small`（每個標籤 50 筆）。在 owner 審查並另建一份未曾看過的測試集之前，golden 上的改善不能當成泛化的證據。
 
 ## Owner 的決定（2026-11-14）
@@ -330,12 +333,13 @@ B7 移除 0 列是預期結果：B3 已在切分前對全部資料做 near-dupli
 
 ## Owner 的決定（2026-11-15）
 
-- **Q5.** 用本機的開源 MT 模型把 Dolly 的指令句譯成正體中文，補中文的良性指令句（B12–B13）。這縮小了原本「不用機器生成或改寫的樣本」的 Non-goal：允許對已授權、人工撰寫的 source 做機器翻譯；LLM 生成或改寫仍不採用。MT 模型的授權必須允許這種用途，不用 NC 授權的模型（例如 NLLB）。
+- **Q5.** 把 Dolly 中未使用的指令句譯成正體中文，補中文的良性指令句（B12–B13）。這縮小了原本「不用 LLM 生成或改寫樣本」的 Non-goal：LLM 只能當 translator，翻譯已授權、人工撰寫的 source。LLM 生成或改寫的樣本仍不採用。
+- **Q6.** 翻譯者用 Claude Haiku，不用本機的 `Helsinki-NLP/opus-mt-en-zh`：後者的輸出品質太差（例如把 business verticals 直譯成「商業縱向」）。翻譯分十批、每批 200 筆，提示要求忠實譯成台灣正體中文、不回答指令。翻譯結果提交為 `sources/dolly-zh-hant.jsonl`。有一筆原文引用歌詞，translator 拒絕翻譯，列在 `translation_exclude`。
 
 ## Non-goals
 
 - 多類別內容安全的資料。
-- 用 LLM 生成或改寫樣本。機器翻譯已授權、人工撰寫的 source 不在此限（Q5，2026-11-15）。
-- 把資料檔提交進 git 或上傳到 Hub。
+- 用 LLM 生成或改寫樣本。LLM 只能當 translator，翻譯已授權、人工撰寫的 source（Q5、Q6，2026-11-15）。
+- 把資料檔提交進 git 或上傳到 Hub。例外：`sources/dolly-zh-hant.jsonl`（B13），因為翻譯無法重現。
 - 修正上游資料集的錯誤標籤（只移除近似重複中的矛盾）。
 - zh-TW 訓練資料的人工撰寫（golden set 只用於評估）。
