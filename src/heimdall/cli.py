@@ -1,4 +1,4 @@
-"""`heimdall` command line: data, train, evaluate, guard."""
+"""`heimdall` command line: data, train, evaluate, sweep, guard."""
 
 from __future__ import annotations
 
@@ -17,10 +17,25 @@ def main(argv: list[str] | None = None) -> int:
     t.add_argument("--batch-size", type=int, default=16)
     t.add_argument("--lr", type=float, default=5e-5)
     t.add_argument("--cpu", action="store_true", help="force CPU")
+    t.add_argument("--seed", type=int, default=42, help="seeds head init, dropout and shuffle order")
+    t.add_argument("--artifact-dir", type=Path, default=Path("artifacts/encoder"))
+    t.add_argument("--no-mlflow", action="store_true", help="do not track this run in MLflow")
+    t.add_argument("--log-every", type=int, default=10, help="log train loss and lr every k steps")
     e = sub.add_parser("evaluate", help="evaluate keyword + encoder on test and the golden set")
     e.add_argument("--name", default="walking-skeleton")
     e.add_argument("--encoder-dir", type=Path, default=None, help="checkpoint dir (default artifacts/encoder)")
     e.add_argument("--golden", type=Path, default=Path("golden/zh-tw.jsonl"), help="golden set (skipped if absent)")
+    e.add_argument("--no-mlflow", action="store_true", help="do not log metrics into the model's MLflow run")
+    s = sub.add_parser("sweep", help="train and evaluate once per seed; report mean, std, min, max")
+    s.add_argument("--seeds", type=int, nargs="+", required=True)
+    s.add_argument("--name", required=True, help="writes artifacts/sweep/<name>/ and reports/<name>.json")
+    s.add_argument("--epochs", type=int, default=4)
+    s.add_argument("--batch-size", type=int, default=16)
+    s.add_argument("--lr", type=float, default=5e-5)
+    s.add_argument("--cpu", action="store_true", help="force CPU")
+    s.add_argument("--no-mlflow", action="store_true")
+    s.add_argument("--golden", type=Path, default=Path("golden/zh-tw.jsonl"), help="golden set (skipped if absent)")
+    s.add_argument("--log-every", type=int, default=10)
     g = sub.add_parser("guard", help="classify one text")
     g.add_argument("text")
     g.add_argument("--model", choices=["encoder", "keyword"], default="encoder")
@@ -35,12 +50,21 @@ def main(argv: list[str] | None = None) -> int:
             return 1
     elif args.cmd == "train":
         from heimdall.encoder import train
-        train(args.epochs, args.batch_size, args.lr, args.cpu)
+        train(args.epochs, args.batch_size, args.lr, args.cpu, seed=args.seed, artifact_dir=args.artifact_dir,
+              track=not args.no_mlflow, log_every=args.log_every)
     elif args.cmd == "evaluate":
         from heimdall.evaluate import evaluate
         try:
-            evaluate(args.name, args.encoder_dir, args.golden)
+            evaluate(args.name, args.encoder_dir, args.golden, track=not args.no_mlflow)
         except FileNotFoundError as err:
+            print(f"error: {err}", file=sys.stderr)
+            return 2
+    elif args.cmd == "sweep":
+        from heimdall.sweep import sweep
+        try:
+            sweep(args.name, args.seeds, epochs=args.epochs, batch_size=args.batch_size, lr=args.lr,
+                  force_cpu=args.cpu, track=not args.no_mlflow, golden_path=args.golden, log_every=args.log_every)
+        except (FileNotFoundError, ValueError) as err:
             print(f"error: {err}", file=sys.stderr)
             return 2
     elif args.cmd == "guard":

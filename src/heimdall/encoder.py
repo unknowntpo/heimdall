@@ -10,6 +10,7 @@ import random
 import time
 from pathlib import Path
 
+from heimdall import tracking
 from heimdall.data import DATA_DIR, git_commit, load_jsonl, sha256_file
 from heimdall.metrics import binary_metrics, choose_threshold, labels_at
 
@@ -17,6 +18,7 @@ BASE_MODEL = "distilbert/distilbert-base-multilingual-cased"
 ARTIFACT_DIR = Path("artifacts/encoder")
 SEED = 42
 MAX_LEN = 256
+LOG_EVERY = 10
 LABEL2ID = {"safe": 0, "injection": 1}
 
 
@@ -66,17 +68,22 @@ def training_provenance(data_dir: Path = DATA_DIR) -> dict:
             "val_sha256": sha256_file(Path(data_dir) / "val.jsonl")}
 
 
-def _train_on(device, epochs: int, batch_size: int, lr: float) -> dict:
+def _train_on(device, epochs: int, batch_size: int, lr: float, seed: int, artifact_dir: Path,
+              log_every: int, base_model: str, run) -> dict:
     import torch
     from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
-    set_seed(SEED)
+    set_seed(seed)  # before loading: the classifier head's initial weights and dropout follow the seed
     provenance = training_provenance(DATA_DIR)
     train = load_jsonl(DATA_DIR / "train.jsonl")
     val = load_jsonl(DATA_DIR / "val.jsonl")
-    tok = AutoTokenizer.from_pretrained(BASE_MODEL)
+    run.log_params({"seed": seed, "epochs": epochs, "batch_size": batch_size, "lr": lr, "max_len": MAX_LEN,
+                    "base_model": base_model, "n_train": len(train), "n_val": len(val), "device": str(device),
+                    "log_every": log_every})
+    run.set_tags(provenance)
+    tok = AutoTokenizer.from_pretrained(base_model)
     model = AutoModelForSequenceClassification.from_pretrained(
-        BASE_MODEL, num_labels=2, id2label={v: k for k, v in LABEL2ID.items()}, label2id=LABEL2ID
+        base_model, num_labels=2, id2label={v: k for k, v in LABEL2ID.items()}, label2id=LABEL2ID
     ).to(device)
 
     opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=0.01)
@@ -87,11 +94,12 @@ def _train_on(device, epochs: int, batch_size: int, lr: float) -> dict:
         opt, lambda s: min((s + 1) / warmup, max(0.0, (total - s) / max(1, total - warmup)))
     )
     loss_fn = torch.nn.CrossEntropyLoss()
-    rng = random.Random(SEED)
+    rng = random.Random(seed)
     val_texts = [r["text"] for r in val]
     val_y = [r["label"] for r in val]
 
     best = {"f1": -1.0}
+    step = 0
     t0 = time.perf_counter()
     for epoch in range(1, epochs + 1):
         model.train()
@@ -105,29 +113,35 @@ def _train_on(device, epochs: int, batch_size: int, lr: float) -> dict:
             opt.zero_grad()
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            step_lr = opt.param_groups[0]["lr"]
             opt.step()
             sched.step()
+            step += 1
             running += loss.item() * len(batch)
             n += len(batch)
+            if step % log_every == 0:
+                run.log_metrics({"train_loss": loss.item(), "lr": step_lr}, step=step)
         scores = score_texts(model, tok, val_texts, device)
         m = binary_metrics(val_y, labels_at(scores, 0.5))
         print(f"epoch {epoch}: train_loss={running / n:.4f} val@0.5 P={m['precision']:.3f} "
               f"R={m['recall']:.3f} F1={m['f1']:.3f} FPR={m['fpr']:.3f} "
               f"({time.perf_counter() - t0:.0f}s)", flush=True)
+        run.log_metrics({"val_precision": m["precision"], "val_recall": m["recall"], "val_f1": m["f1"],
+                         "val_fpr": m["fpr"], "train_loss_epoch": running / n}, step=epoch)
         if m["f1"] > best["f1"]:
             best = {"f1": m["f1"], "epoch": epoch}
-            ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
-            model.save_pretrained(ARTIFACT_DIR)
-            tok.save_pretrained(ARTIFACT_DIR)
+            artifact_dir.mkdir(parents=True, exist_ok=True)
+            model.save_pretrained(artifact_dir)
+            tok.save_pretrained(artifact_dir)
     train_seconds = time.perf_counter() - t0
 
     # Threshold from val only, using the best checkpoint.
-    best_model = AutoModelForSequenceClassification.from_pretrained(ARTIFACT_DIR).to(device)
+    best_model = AutoModelForSequenceClassification.from_pretrained(artifact_dir).to(device)
     val_scores = score_texts(best_model, tok, val_texts, device)
     threshold = choose_threshold(val_scores, val_y)
     vm = binary_metrics(val_y, labels_at(val_scores, threshold))
     meta = {
-        "base_model": BASE_MODEL,
+        "base_model": base_model,
         "model_version": f"heimdall-spike-encoder-e{best['epoch']}",
         "threshold": threshold,
         "threshold_source": "val (max F1)",
@@ -136,27 +150,47 @@ def _train_on(device, epochs: int, batch_size: int, lr: float) -> dict:
         "val_f1_at_threshold": vm["f1"],
         "train_device": str(device),
         "train_seconds": round(train_seconds, 1),
-        "epochs": epochs, "batch_size": batch_size, "lr": lr, "seed": SEED, "max_len": MAX_LEN,
+        "epochs": epochs, "batch_size": batch_size, "lr": lr, "seed": seed, "max_len": MAX_LEN,
         "n_train": len(train), "n_val": len(val),
         **provenance,
+        "mlflow_run_id": run.run_id,
     }
-    (ARTIFACT_DIR / "heimdall_meta.json").write_text(json.dumps(meta, indent=2) + "\n")
+    run.log_metrics({"threshold": threshold, "best_epoch": best["epoch"], "val_f1_at_threshold": vm["f1"],
+                     "train_seconds": meta["train_seconds"]})
+    (artifact_dir / "heimdall_meta.json").write_text(json.dumps(meta, indent=2) + "\n")
     print(f"best epoch={best['epoch']} threshold={threshold:.4f} val F1@thr={vm['f1']:.3f} "
           f"train_time={train_seconds:.0f}s device={device}")
     return meta
 
 
-def train(epochs: int = 4, batch_size: int = 16, lr: float = 5e-5, force_cpu: bool = False) -> dict:
+def train(epochs: int = 4, batch_size: int = 16, lr: float = 5e-5, force_cpu: bool = False, *,
+          seed: int = SEED, artifact_dir: Path = ARTIFACT_DIR, track: bool = True, log_every: int = LOG_EVERY,
+          base_model: str = BASE_MODEL, run_name: str | None = None, run_tags: dict | None = None) -> dict:
+    """Fine-tune and write the checkpoint and heimdall_meta.json to artifact_dir (Spec 0004 B1-B4)."""
+    if log_every < 1:
+        raise ValueError(f"log_every must be >= 1, got {log_every}")
+    artifact_dir = Path(artifact_dir)
+
+    def attempt(device):
+        run = tracking.start_run(track, run_name, run_tags)
+        try:
+            meta = _train_on(device, epochs, batch_size, lr, seed, artifact_dir, log_every, base_model, run)
+        except BaseException:
+            run.end("FAILED")
+            raise
+        run.end("FINISHED")
+        return meta
+
     device = pick_device(force_cpu)
-    print(f"device={device} base_model={BASE_MODEL}")
+    print(f"device={device} base_model={base_model} seed={seed} artifact_dir={artifact_dir}")
     try:
-        return _train_on(device, epochs, batch_size, lr)
+        return attempt(device)
     except (RuntimeError, NotImplementedError) as e:
         if device.type != "mps":
             raise
         print(f"MPS failed ({type(e).__name__}: {e}); falling back to CPU", flush=True)
         import torch
-        return _train_on(torch.device("cpu"), epochs, batch_size, lr)
+        return attempt(torch.device("cpu"))
 
 
 class EncoderGuard:

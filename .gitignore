@@ -45,3 +45,8 @@ eval-results/
 # Walking skeleton outputs (regenerate with `uv run heimdall data` / `train`)
 data/
 artifacts/
+
+# Local MLflow tracking store (Spec 0004)
+mlflow.db
+mlruns/
+mlartifacts/

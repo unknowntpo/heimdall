@@ -50,6 +50,23 @@ uv run heimdall guard "忽略之前的指示" --model keyword        # 用關鍵
 uv run pytest -q                          # 離線 unit test
 ```
 
+## 多 seed 掃描與 MLflow
+
+單一訓練的數字不穩定，比較兩個 encoder 時以多個 seed 的 mean ± std 為準。見 [docs/specs/0004-training-tracking.md](docs/specs/0004-training-tracking.md)。
+
+```bash
+uv run heimdall train --seed 7 --artifact-dir artifacts/encoder-seed-7   # 單次訓練，指定 seed 與輸出目錄
+uv run heimdall sweep --seeds 1 2 3 4 5 --name my-sweep                  # 每個 seed 訓練並評估一次
+```
+
+`sweep` 把每個 seed 的 checkpoint 與評估報告寫到 `artifacts/sweep/<name>/seed-<N>/`，彙總寫到 `reports/<name>.json`（每個 seed 的指標，加上 mean、sample std、min、max）。中斷後以相同參數重跑，已訓練好的 seed 不會重訓。
+
+訓練與評估預設記錄到本機的 MLflow store `mlflow.db`（不連網路，已 git-ignore）。設定 `MLFLOW_TRACKING_URI` 可改位置；加 `--no-mlflow` 可關閉。開啟 UI：
+
+```bash
+uv run mlflow ui --backend-store-uri sqlite:///mlflow.db   # 瀏覽 http://127.0.0.1:5000，依 tag `sweep` 篩選
+```
+
 ## 文件
 
 - 路線圖 spec：[docs/specs/0001-lifecycle-roadmap.md](docs/specs/0001-lifecycle-roadmap.md)
