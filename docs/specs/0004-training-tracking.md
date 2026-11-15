@@ -164,6 +164,33 @@ uv run heimdall sweep --seeds 1 2 3 4 5 --name m1-zh-negatives-seeds
 | `tests/test_train_safety.py` | T14、T15、T16 | 中斷的重訓不留 meta；`FAILED` 狀態與 `end` 失敗；保留 best epoch；threshold 來自 val |
 | 量測命令 | T13 | 5 seed sweep |
 
+## 量測結果（T13）
+
+2026-11-16 在本機以 MPS 執行 `uv run heimdall sweep --seeds 1 2 3 4 5 --name m1-zh-negatives-seeds`。證據為 `reports/m1-zh-negatives-seeds.json`。訓練當時的 commit 是 `95567fa`，早於 B10 的修正；B10 只影響重訓到既有目錄的情況，這次的 5 個目錄都是新的。
+
+每個 seed 的 `train_seconds` 為 659 到 834 秒。總時間不具參考價值：執行期間機器曾進入睡眠，也與測試搶 CPU。
+
+| 指標 | mean | std | min | max |
+| --- | --- | --- | --- | --- |
+| test F1 | 0.965 | 0.004 | 0.959 | 0.968 |
+| test recall | 0.951 | 0.005 | 0.944 | 0.955 |
+| test FPR | 0.74% | 0.20% | 0.53% | 1.05% |
+| test en FPR | 0.57% | 0.19% | 0.33% | 0.83% |
+| test zh-Hant F1 | 0.915 | 0.012 | 0.897 | 0.930 |
+| test zh-Hant FPR | 1.09% | 0.41% | 0.61% | 1.52% |
+| golden precision | 0.875 | 0.050 | 0.800 | 0.921 |
+| golden recall | 0.736 | 0.085 | 0.660 | 0.880 |
+| golden FPR | 11.2% | 6.6% | 6.0% | 22.0% |
+| golden `benign-imperative` 誤報（共 30 筆） | 5.0 | 2.7 | 2 | 9 |
+| threshold | 0.347 | 0.286 | 0.051 | 0.781 |
+
+觀察：
+
+1. Test 上的指標穩定（F1 的 std 為 0.004）。Golden 上的指標不穩定（recall 0.66 到 0.88，`benign-imperative` 誤報 2 到 9）。
+2. Threshold 的範圍是 0.051 到 0.781。Val 幾乎可完全分開，所以使 val F1 最大的 threshold 落在一段很寬的區間內，位置由雜訊決定。Golden 上誤報與 recall 的此消彼長主要來自這個 threshold。
+3. Spec 0003 記錄的單次結果（seed 42，`benign-imperative` 誤報 14/30、golden recall 0.900）落在這 5 個 seed 的範圍之外。單一 seed 的 golden 數字不可用於比較。
+4. Golden 只有 100 筆且尚未經 owner 審查，上表的 golden 數字只用來說明變異，不是模型品質的結論。
+
 ## Non-goals
 
 - MPS 上的 bit-level 可重現。固定 seed 只在 CPU 上保證相同結果（T2）；MPS 的結果只能以 sweep 的 std 描述。
