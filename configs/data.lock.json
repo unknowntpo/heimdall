@@ -36,17 +36,18 @@
       "revision": "bdd27f4d94b9c1f951818a7da7fd7aeea5dbff1a",
       "license": "cc-by-sa-3.0 (translation of databricks/databricks-dolly-15k; see sources/dolly-zh-hant.NOTICE)",
       "raw_rows": 2000,
-      "rows_after_normalise": 1999,
+      "rows_after_normalise": 1941,
       "translation": {
         "file": "sources/dolly-zh-hant.jsonl",
-        "sha256": "c9a0695b7e033e1a1ff366675a6a238fe3caddc8cd24a9a5201a9db172208eeb",
-        "file_rows": 1948,
+        "sha256": "c99b57e99950e421b02f8490c03b8cf499a55a39b78339f1d7286e1754c59948",
+        "file_rows": 1947,
         "selected": 2000,
-        "excluded": 1,
+        "excluded": 2,
         "dropped": {
           "empty": 0,
           "identical": 0,
-          "no_cjk": 0
+          "no_cjk": 0,
+          "english_overlap": 57
         }
       }
     }
@@ -54,8 +55,8 @@
   "dropped_sources": [],
   "golden_rows_sha256": "e2deb3bad49f4032065aba9628d3dae1971ad2fc847596d2d1fe4a2431a54baf",
   "removed": {
-    "input_rows": 8629,
-    "exact_removed": 141,
+    "input_rows": 8571,
+    "exact_removed": 87,
     "exact_contradiction_groups": 0,
     "exact_contradiction_rows": 0,
     "near_removed": 145,
@@ -72,39 +73,39 @@
   },
   "splits": {
     "train": {
-      "rows": 5628,
+      "rows": 5626,
       "labels": {
-        "safe": 4393,
+        "safe": 4391,
         "injection": 1235
       },
-      "sha256": "ccb7862d28b50884923f2eb33a2aaac4d01f7b1faf690a584aed10ac7d85c30f"
+      "sha256": "95006df7ee2c8071b8746b1773b85ec6b7a01756e719c6cbdc70bef87b160e94"
     },
     "val": {
-      "rows": 1407,
+      "rows": 1406,
       "labels": {
-        "safe": 964,
+        "safe": 963,
         "injection": 443
       },
-      "sha256": "f53e1bad08276946709127d7343bd5c5a69f6412edf553d622d12f5fe5ad4467"
+      "sha256": "d4ec5ce6362e2e54be4f22474fa33bb95d11cab2f9200558ab7ddb69eef840f5"
     },
     "test": {
-      "rows": 1308,
+      "rows": 1307,
       "labels": {
-        "safe": 950,
+        "safe": 949,
         "injection": 358
       },
-      "sha256": "c4eaefe2e35f829e3950966f388e1d483b9540108448b914108eccd76f9c121b"
+      "sha256": "93f8ad461f61394323495262cda0b8c79618caeffc3c2a468afc5dd5bd23e4df"
     }
   },
   "stats": {
     "train": {
       "by_label": {
         "injection": 1235,
-        "safe": 4393
+        "safe": 4391
       },
       "by_source": {
         "Lakera/gandalf_ignore_instructions|injection": 614,
-        "databricks/databricks-dolly-15k#zh-Hant|safe": 1365,
+        "databricks/databricks-dolly-15k#zh-Hant|safe": 1363,
         "databricks/databricks-dolly-15k|safe": 2071,
         "deepset/prompt-injections|injection": 149,
         "deepset/prompt-injections|safe": 278,
@@ -119,7 +120,7 @@
         "en|injection": 1052,
         "en|safe": 2663,
         "zh-Hant|injection": 137,
-        "zh-Hant|safe": 1622
+        "zh-Hant|safe": 1620
       },
       "median_chars": {
         "safe": 42,
@@ -129,11 +130,11 @@
     "val": {
       "by_label": {
         "injection": 443,
-        "safe": 964
+        "safe": 963
       },
       "by_source": {
         "Lakera/gandalf_ignore_instructions|injection": 272,
-        "databricks/databricks-dolly-15k#zh-Hant|safe": 303,
+        "databricks/databricks-dolly-15k#zh-Hant|safe": 302,
         "databricks/databricks-dolly-15k|safe": 445,
         "deepset/prompt-injections|injection": 46,
         "deepset/prompt-injections|safe": 64,
@@ -148,21 +149,21 @@
         "en|injection": 386,
         "en|safe": 577,
         "zh-Hant|injection": 43,
-        "zh-Hant|safe": 362
+        "zh-Hant|safe": 361
       },
       "median_chars": {
-        "safe": 44.0,
+        "safe": 44,
         "injection": 77
       }
     },
     "test": {
       "by_label": {
         "injection": 358,
-        "safe": 950
+        "safe": 949
       },
       "by_source": {
         "Lakera/gandalf_ignore_instructions|injection": 112,
-        "databricks/databricks-dolly-15k#zh-Hant|safe": 277,
+        "databricks/databricks-dolly-15k#zh-Hant|safe": 276,
         "databricks/databricks-dolly-15k|safe": 440,
         "deepset/prompt-injections|injection": 59,
         "deepset/prompt-injections|safe": 56,
@@ -177,10 +178,10 @@
         "en|injection": 279,
         "en|safe": 599,
         "zh-Hant|injection": 59,
-        "zh-Hant|safe": 331
+        "zh-Hant|safe": 330
       },
       "median_chars": {
-        "safe": 45.0,
+        "safe": 45,
         "injection": 131.0
       }
     }
