@@ -8,13 +8,13 @@ import statistics
 from pathlib import Path
 
 from heimdall.data import DATA_DIR, GOLDEN_PATH, sha256_file
-from heimdall.encoder import BASE_MODEL, LOG_EVERY, MAX_LEN, training_provenance
+from heimdall.encoder import BASE_MODEL, LOG_EVERY, MAX_LEN, META, WEIGHTS, training_provenance
 from heimdall.evaluate import REPORT_DIR
 
 SWEEP_DIR = Path("artifacts/sweep")
 REUSE_KEYS = ("seed", "epochs", "batch_size", "lr", "max_len", "base_model", "git_commit", "train_sha256",
               "val_sha256")
-NAME_RE = re.compile(r"[A-Za-z0-9._-]+")
+NAME_RE = re.compile(r"[A-Za-z0-9_-][A-Za-z0-9._-]*")  # no leading '.', so neither '.' nor '..'
 
 
 def aggregate(per_seed: list[dict[str, float | None]]) -> dict[str, dict]:
@@ -59,7 +59,8 @@ def sweep(name: str, seeds: list[int], epochs: int = 4, batch_size: int = 16, lr
     from heimdall.evaluate import evaluate
 
     if not NAME_RE.fullmatch(name):
-        raise ValueError(f"sweep name {name!r} may only contain letters, digits, '.', '_' and '-'")
+        raise ValueError(f"sweep name {name!r} may only contain letters, digits, '.', '_' and '-', "
+                         "and may not start with '.'")
     if len(set(seeds)) != len(seeds):
         raise ValueError(f"duplicate seeds: {seeds}")
     for split in ("train", "val", "test"):
@@ -72,9 +73,9 @@ def sweep(name: str, seeds: list[int], epochs: int = 4, batch_size: int = 16, lr
     per_seed = []
     for seed in seeds:
         d = SWEEP_DIR / name / f"seed-{seed}"
-        meta_path = d / "heimdall_meta.json"
+        meta_path = d / META
         old = json.loads(meta_path.read_text()) if meta_path.exists() else None
-        reused = reusable(old, {"seed": seed, **hyper, **provenance})
+        reused = (d / WEIGHTS).exists() and reusable(old, {"seed": seed, **hyper, **provenance})
         if reused:
             print(f"seed {seed}: reusing {d}", flush=True)
             meta = old

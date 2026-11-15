@@ -108,17 +108,18 @@ uv run heimdall sweep --seeds 1 2 3 4 5 --name m1-zh-negatives-seeds
   - 每 k 步（`--log-every k`，預設 10，必須 ≥ 1）：`train_loss`（該步的 batch loss）與 `lr`（該步使用的 learning rate），step 是從 1 起算的全域步數。
   - 每個 epoch：`val_precision`、`val_recall`、`val_f1`、`val_fpr`（threshold 0.5）與 `train_loss_epoch`（該 epoch 的平均 train loss），step 是 epoch 編號。
   - 結束時：`threshold`、`best_epoch`、`val_f1_at_threshold`、`train_seconds`。
-  - `heimdall_meta.json` 記錄 `mlflow_run_id`。訓練正常結束時 run 狀態為 `FINISHED`；拋出例外時為 `FAILED`。MPS 失敗退回 CPU 時，CPU 的重試是另一筆 run。
+  - `heimdall_meta.json` 記錄 `mlflow_run_id`。訓練正常結束時 run 狀態為 `FINISHED`；拋出例外時為 `FAILED`。把 run 標為 `FAILED` 的呼叫本身失敗時，印出一行 `warning:` 到 stderr，原本的訓練例外照常拋出。MPS 失敗退回 CPU 時，CPU 的重試是另一筆 run。
 - **B5 評估紀錄。** `heimdall evaluate` 在 checkpoint 的 meta 有 `mlflow_run_id` 且 tracking 開啟時，把 encoder 的指標寫入該 run：`test_precision`、`test_recall`、`test_f1`、`test_fpr`、每個語言的 `test_<lang>_f1` 與 `test_<lang>_fpr`；golden set 存在時另寫 `golden_precision`、`golden_recall`、`golden_fpr`、`golden_benign_imperative_fp`。Run 不存在、store 無法開啟或寫入失敗時，印出一行 `warning:` 到 stderr，評估照常完成並寫出報告。`heimdall evaluate --no-mlflow` 不寫入任何 run。
 - **B6 Sweep。** `heimdall sweep --seeds S1 … --name NAME [--epochs --batch-size --lr --cpu --no-mlflow --golden PATH --log-every k]`。對每個 seed：
   1. 訓練到 `artifacts/sweep/<NAME>/seed-<N>/`（B7 允許時跳過），run 名稱是 `<NAME>/seed-<N>`，tag `sweep` 是 NAME。
   2. 用 `heimdall evaluate` 的同一個函式評估 test 與 golden set（檔案存在時），報告寫到該 seed 目錄的 `report.json`，不寫入 `reports/`。
   3. 全部 seed 完成後寫出 `reports/<NAME>.json`，內容見 Example：`per_seed` 的每一筆有 `seed`、`artifact_dir`、`mlflow_run_id`、`reused` 與 `metrics`；`aggregate` 依 B8 計算；`provenance` 有 `git_commit`、`train_sha256`、`val_sha256`、`test_sha256`、`golden_sha256`（沒有 golden 時為 `null`）；另有 `seeds` 與 `hyperparameters`。
   - `metrics` 的鍵：`threshold`、`best_epoch`、`test.precision`、`test.recall`、`test.f1`、`test.fpr`、每個語言的 `test.<lang>.f1` 與 `test.<lang>.fpr`；golden set 存在時另有 `golden.precision`、`golden.recall`、`golden.fpr`、`golden.benign_imperative_fp`（分母 `golden.benign_imperative_n` 也記錄）。
-  - NAME 只能含英數字、`.`、`_`、`-`。Seeds 不可重複。違反時以非零狀態結束，不訓練。
-- **B7 續跑。** 一個 seed 的目錄已有 `heimdall_meta.json`，且其中的 `seed`、`epochs`、`batch_size`、`lr`、`max_len`、`base_model`、`git_commit`、`train_sha256`、`val_sha256` 都與這次相同時，不重訓，`reused` 為 `true`。`git_commit` 以 `-dirty` 結尾或是 `unknown` 時一律重訓：同一個 HEAD 加上未提交的修改，無法證明程式碼相同。
+  - NAME 只能含英數字、`.`、`_`、`-`，且不可以 `.` 開頭（所以 `.` 與 `..` 無效）。Seeds 不可重複。違反時以非零狀態結束，不訓練。
+- **B7 續跑。** 一個 seed 的目錄已有 `heimdall_meta.json` 與權重檔 `model.safetensors`，且 meta 中的 `seed`、`epochs`、`batch_size`、`lr`、`max_len`、`base_model`、`git_commit`、`train_sha256`、`val_sha256` 都與這次相同時，不重訓，`reused` 為 `true`。`git_commit` 以 `-dirty` 結尾或是 `unknown` 時一律重訓：同一個 HEAD 加上未提交的修改，無法證明程式碼相同。
 - **B8 Aggregate。** 對每個指標，取有值的 seed（缺值的 seed 不計入），計算 `n`、`mean`、`std`（sample std，ddof=1）、`min`、`max`。`n` 為 1 時 `std` 是 `null`；`n` 為 0 時 `mean`、`std`、`min`、`max` 都是 `null`。這是一個不讀寫檔案的純函式。
 - **B9 失敗即停。** `data/train.jsonl`、`data/val.jsonl`、`data/test.jsonl` 任一不存在時，`heimdall sweep` 在訓練前以非零狀態結束，錯誤訊息含缺少的路徑，不建立 sweep 目錄，也不寫出報告。
+- **B10 未完成的目錄。** 訓練在寫入第一個 checkpoint 之前，先刪除 DIR 中既有的 `heimdall_meta.json`；新的 meta 只在訓練結束時寫入。所以訓練中斷後，DIR 可能有新的權重但沒有 meta：sweep 不會重用它（B7），`EncoderGuard` 與 `heimdall evaluate` 也不會載入它。
 
 ## Acceptance
 
@@ -129,17 +130,21 @@ uv run heimdall sweep --seeds 1 2 3 4 5 --name m1-zh-negatives-seeds
 ### Behavior
 
 - **T1** 前提為小型模型與小型資料 → `train(seed=7, artifact_dir=DIR)` → DIR 有 checkpoint 與 `heimdall_meta.json`，其中 `seed` 是 7；`artifacts/encoder` 沒有被建立 → 測試。
-- **T2** 前提同 T1 → 以相同 seed 在 CPU 訓練兩次，再以另一個 seed 訓練一次 → 相同 seed 的 classifier 權重與 threshold 相同；不同 seed 的 classifier 權重不同（對照）→ 測試。
-- **T3** 前提為沒有設定 `MLFLOW_TRACKING_URI`，以及設定為某個值 → 解析 tracking URI → 前者是 `sqlite:///mlflow.db`，後者是該值 → 測試。
+- **T2** 前提同 T1 → 以相同 seed 在 CPU 訓練兩次，再以另一個 seed 訓練一次 → 相同 seed 的 classifier 權重與 threshold 相同；不同 seed 的 classifier 權重不同（對照）。另外分開驗證兩個來源：`lr` 為 0（權重不更新）時，不同 seed 的 head 初始權重不同；train 的 batch 順序在相同 seed 下相同、不同 seed 下不同 → 測試。
+- **T3** 前提為沒有設定 `MLFLOW_TRACKING_URI`，以及設定為某個值 → 解析 tracking URI → 前者是 `sqlite:///mlflow.db`，後者是該值；開啟 tracking 時，匯入 MLflow 之前 `MLFLOW_DISABLE_TELEMETRY` 已是 `true` → 測試。
 - **T4** 前提為指向 `tmp_path` 的 SQLite tracking URI、2 個 epoch、`log_every` 2 → 訓練 → meta 的 `mlflow_run_id` 指向一筆 `FINISHED` 的 run；run 有 B4 的全部 params 與 tags；`train_loss` 與 `lr` 的 step 都是 2 的倍數；`val_f1` 等四個 epoch 指標與 `train_loss_epoch` 各有 2 個值；`threshold`、`best_epoch`、`val_f1_at_threshold`、`train_seconds` 的值與 meta 相同 → 測試。
 - **T5** 前提為 `--no-mlflow` → 訓練 → meta 的 `mlflow_run_id` 是 `null`，tracking URI 指向的 SQLite 檔沒有被建立 → 測試（T4 是開啟 tracking 的對照）。
 - **T6** 前提為一個有 `mlflow_run_id` 的 checkpoint 與一份 golden set → `evaluate` → 該 run 有 B5 的 test、分語言與 golden 指標，值與報告相同 → 測試。
 - **T7** 前提為 meta 的 `mlflow_run_id` 指向不存在的 run → `evaluate` → 印出 `warning:`，報告照常寫出；`evaluate(track=False)` 對存在的 run 不寫入任何指標 → 測試。
 - **T8** 前提為已知數值 → 呼叫 aggregate → mean、sample std（ddof=1）、min、max 與手算相同；n=1 時 std 是 `null`；n=0 時四個值都是 `null`；缺值的 seed 不計入 n；所有值相同時 std 是 0.0 → 測試。
-- **T9** 前提為小型模型、小型資料與 golden set → `sweep(seeds=[1, 2])` → 兩個 seed 目錄都有 checkpoint、meta 與 `report.json`；`reports/<NAME>.json` 有 B6 的全部欄位，`per_seed` 的 `metrics` 與各自的 `report.json` 一致，`aggregate` 的 n 是 2 → 測試。
-- **T10** 前提為 T9 完成後 → 以相同參數再跑一次 → 兩個 seed 都 `reused`，checkpoint 沒有被改寫；改變 `lr`、`git_commit` 帶 `-dirty`、`seed` 不同、或沒有 meta 時不可重用（對照）→ 測試。
-- **T11** 前提為缺少 `data/test.jsonl` → `heimdall sweep` → 非零狀態結束，錯誤訊息含 `test.jsonl`，沒有 sweep 目錄與報告；NAME 含 `/` 或 seed 重複時同樣非零結束 → 測試。
-- **T12** 前提為命令列參數 → 解析 `train`、`evaluate`、`sweep` → `--seed`、`--artifact-dir`、`--no-mlflow`、`--log-every` 與 sweep 的參數傳到對應函式；不給時是預設值（seed 42、`artifacts/encoder`、tracking 開啟、log_every 10）→ 測試。
+- **T9** 前提為小型模型、小型資料與 golden set → `sweep(seeds=[1, 2])` → 兩個 seed 目錄都有 checkpoint、meta 與 `report.json`；`reports/<NAME>.json` 有 B6 的全部欄位，`per_seed` 的 `metrics` 與各自的 `report.json` 一致，`aggregate` 的 n 是 2；每個 seed 的 `report.json` 用該 seed 目錄的模型與 threshold，且兩個 seed 的 threshold 不同（對照）；每筆 run 的名稱是 `<NAME>/seed-<N>`，tag `sweep` 是 NAME；`golden_sha256` 是 golden set 的 sha256 → 測試。
+- **T10** 前提為 T9 完成後 → 以相同參數再跑一次 → 兩個 seed 都 `reused`，checkpoint 沒有被改寫；改變 `lr`、`git_commit` 帶 `-dirty`、`seed` 不同、沒有 meta、或沒有權重檔時不可重用（對照）→ 測試。
+- **T11** 前提為缺少 `data/test.jsonl` → `heimdall sweep` → 非零狀態結束，錯誤訊息含 `test.jsonl`，沒有 sweep 目錄與報告；NAME 含 `/`、以 `.` 開頭（含 `.` 與 `..`）或 seed 重複時同樣非零結束；NAME `m1.v2` 有效（對照）→ 測試。
+- **T12** 前提為命令列參數 → 解析 `train`、`evaluate`、`sweep` → `--seed`、`--artifact-dir`、`--no-mlflow`、`--log-every` 與 sweep 的參數傳到對應函式；不給時是預設值（seed 42、`artifacts/encoder`、tracking 開啟、log_every 10；`evaluate` 的 tracking 開啟；`sweep` 的 epochs 4、batch size 16、lr 5e-5、不強制 CPU、tracking 開啟、`golden/zh-tw.jsonl`、log_every 10）→ 測試。
+
+- **T14** 前提為 DIR 已有一次完整訓練 → 以其他設定重訓到 DIR，並在第一個 checkpoint 寫入後讓訓練拋出例外 → DIR 的權重已改寫（對照），沒有 `heimdall_meta.json`，`EncoderGuard(DIR)` 拋出 `FileNotFoundError`；同一個 seed 目錄再跑 sweep 會重訓，之後才可重用（對照）；刪除權重檔後再跑會重訓 → 測試。
+- **T15** 前提為開啟 tracking → 訓練拋出例外 → run 狀態是 `FAILED`，正常結束的 run 是 `FINISHED`（對照）；`run.end` 本身拋出例外時，拋出的是原本的訓練例外，並印出 `warning:` → 測試。
+- **T16** 前提為 2 個 epoch，第 1 個 epoch 的 val F1 較高 → 訓練 → DIR 的權重是第 1 個 epoch 的權重，不是最後一個 epoch（對照：兩個 epoch 的權重不同），`best_epoch` 是 1；threshold 由 val 的分數與標籤選出，不用 train → 測試。
 
 ### Budget
 
@@ -156,6 +161,7 @@ uv run heimdall sweep --seeds 1 2 3 4 5 --name m1-zh-negatives-seeds
 | `tests/test_evaluate_tracking.py` | T6、T7 | 寫回 run；不存在的 run；`track=False` |
 | `tests/test_sweep.py` | T8、T9、T10、T11 | aggregate 數學；端到端 sweep；續跑與不可重用的對照；缺資料、名稱與重複 seed |
 | `tests/test_cli.py` | T12 | 三個子命令的參數與預設值 |
+| `tests/test_train_safety.py` | T14、T15、T16 | 中斷的重訓不留 meta；`FAILED` 狀態與 `end` 失敗；保留 best epoch；threshold 來自 val |
 | 量測命令 | T13 | 5 seed sweep |
 
 ## Non-goals

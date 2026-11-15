@@ -43,3 +43,28 @@ def test_T5_no_mlflow_records_null_and_creates_no_store(tiny_workdir, tiny_base_
                  base_model=str(tiny_base_model))
     assert meta["mlflow_run_id"] is None
     assert not (tiny_workdir / "mlflow.db").exists()
+
+
+def test_T3_telemetry_is_disabled_before_mlflow_is_imported(tmp_path):
+    import os
+    import subprocess
+    import sys
+
+    code = """
+import importlib.abc, os, sys
+seen = []
+class Spy(importlib.abc.MetaPathFinder):
+    def find_spec(self, name, path, target=None):
+        if name == "mlflow" and not seen:
+            seen.append(os.environ.get("MLFLOW_DISABLE_TELEMETRY"))
+sys.meta_path.insert(0, Spy())
+from heimdall import tracking
+assert "mlflow" not in sys.modules
+tracking.start_run(True, "telemetry")
+print(seen[0])
+"""
+    env = {k: v for k, v in os.environ.items() if k != "MLFLOW_DISABLE_TELEMETRY"}
+    env["MLFLOW_TRACKING_URI"] = f"sqlite:///{tmp_path / 'm.db'}"
+    out = subprocess.run([sys.executable, "-c", code], env=env, cwd=tmp_path, capture_output=True, text=True,
+                         check=True).stdout
+    assert out.strip() == "true"

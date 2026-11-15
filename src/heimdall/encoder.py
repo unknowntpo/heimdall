@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import random
+import sys
 import time
 from pathlib import Path
 
@@ -19,6 +20,8 @@ ARTIFACT_DIR = Path("artifacts/encoder")
 SEED = 42
 MAX_LEN = 256
 LOG_EVERY = 10
+META = "heimdall_meta.json"
+WEIGHTS = "model.safetensors"
 LABEL2ID = {"safe": 0, "injection": 1}
 
 
@@ -98,6 +101,8 @@ def _train_on(device, epochs: int, batch_size: int, lr: float, seed: int, artifa
     val_texts = [r["text"] for r in val]
     val_y = [r["label"] for r in val]
 
+    # B10: from the first checkpoint save on, the old meta would describe new weights; drop it.
+    (artifact_dir / META).unlink(missing_ok=True)
     best = {"f1": -1.0}
     step = 0
     t0 = time.perf_counter()
@@ -157,7 +162,7 @@ def _train_on(device, epochs: int, batch_size: int, lr: float, seed: int, artifa
     }
     run.log_metrics({"threshold": threshold, "best_epoch": best["epoch"], "val_f1_at_threshold": vm["f1"],
                      "train_seconds": meta["train_seconds"]})
-    (artifact_dir / "heimdall_meta.json").write_text(json.dumps(meta, indent=2) + "\n")
+    (artifact_dir / META).write_text(json.dumps(meta, indent=2) + "\n")
     print(f"best epoch={best['epoch']} threshold={threshold:.4f} val F1@thr={vm['f1']:.3f} "
           f"train_time={train_seconds:.0f}s device={device}")
     return meta
@@ -176,7 +181,11 @@ def train(epochs: int = 4, batch_size: int = 16, lr: float = 5e-5, force_cpu: bo
         try:
             meta = _train_on(device, epochs, batch_size, lr, seed, artifact_dir, log_every, base_model, run)
         except BaseException:
-            run.end("FAILED")
+            try:
+                run.end("FAILED")
+            except Exception as e:  # never hide the training exception
+                print(f"warning: cannot mark MLflow run {run.run_id} FAILED: {type(e).__name__}: {e}",
+                      file=sys.stderr)
             raise
         run.end("FINISHED")
         return meta
@@ -197,7 +206,7 @@ class EncoderGuard:
     """Load the trained checkpoint and classify single texts."""
 
     def __init__(self, path: Path = ARTIFACT_DIR, force_cpu: bool = False):
-        meta_path = path / "heimdall_meta.json"
+        meta_path = path / META
         if not meta_path.exists():
             raise FileNotFoundError(
                 f"no trained encoder at {path}/ (missing heimdall_meta.json); run `uv run heimdall train`"

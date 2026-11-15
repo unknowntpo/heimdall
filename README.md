@@ -64,7 +64,7 @@ uv run heimdall sweep --seeds 1 2 3 4 5 --name my-sweep                  # 每�
 訓練與評估預設記錄到本機的 MLflow store `mlflow.db`（不連網路，已 git-ignore）。設定 `MLFLOW_TRACKING_URI` 可改位置；加 `--no-mlflow` 可關閉。開啟 UI：
 
 ```bash
-uv run mlflow ui --backend-store-uri sqlite:///mlflow.db   # 瀏覽 http://127.0.0.1:5000，依 tag `sweep` 篩選
+MLFLOW_DISABLE_TELEMETRY=true uv run mlflow ui --backend-store-uri sqlite:///mlflow.db   # 瀏覽 http://127.0.0.1:5000，依 tag `sweep` 篩選
 ```
 
 ## 文件

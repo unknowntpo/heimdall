@@ -33,3 +33,31 @@ def test_T2_same_seed_same_weights_other_seed_differs(tiny_workdir, tiny_base_mo
     assert _head(a).equal(_head(b))
     assert not _head(a).equal(_head(c))  # control: the seed changes the head initialisation
     assert mc["seed"] == 4
+
+
+def test_T2_head_init_follows_seed_without_training(tiny_workdir, tiny_base_model):
+    # lr=0 keeps the weights at their initial values, so only the seeded head init can differ
+    a, b, c = (tiny_workdir / x for x in ("a", "b", "c"))
+    for d, seed in ((a, 3), (b, 3), (c, 4)):
+        train(epochs=1, batch_size=4, lr=0.0, force_cpu=True, seed=seed, artifact_dir=d, track=False,
+              base_model=str(tiny_base_model))
+    assert _head(a).equal(_head(b))
+    assert not _head(a).equal(_head(c))
+
+
+def test_T2_batch_order_follows_seed(tiny_workdir, tiny_base_model, monkeypatch):
+    import heimdall.encoder as enc
+
+    real, orders = enc._batches, []
+
+    def spy(rows, batch_size, shuffle, rng):
+        batches = list(real(rows, batch_size, shuffle, rng))
+        pos = {id(r): i for i, r in enumerate(rows)}
+        orders.append([pos[id(r)] for b in batches for r in b])
+        return iter(batches)
+
+    monkeypatch.setattr(enc, "_batches", spy)
+    for seed in (3, 3, 4):
+        _train(tiny_base_model, tiny_workdir / f"o{len(orders)}", seed)
+    assert orders[0] == orders[1]
+    assert orders[0] != orders[2]

@@ -27,7 +27,13 @@ def _run(base, **kw):
 
 
 def test_T9_sweep_writes_seed_dirs_and_report(tiny_workdir, tiny_base_model):
+    from mlflow import MlflowClient
+
+    from heimdall import tracking
+    from heimdall.data import sha256_file
+
     report = _run(tiny_base_model)
+    client = MlflowClient(tracking.tracking_uri())
     on_disk = json.loads(Path("reports/tiny.json").read_text())
     assert on_disk == report
     assert report["seeds"] == [1, 2]
@@ -40,6 +46,9 @@ def test_T9_sweep_writes_seed_dirs_and_report(tiny_workdir, tiny_base_model):
         assert rec["seed"] == meta["seed"] == seed and rec["reused"] is False
         assert rec["mlflow_run_id"] == meta["mlflow_run_id"] is not None
         enc = json.loads((d / "report.json").read_text())["models"]["encoder"]
+        assert enc["encoder_dir"] == str(d) and enc["threshold"] == meta["threshold"]  # this seed's own model
+        run = client.get_run(rec["mlflow_run_id"])
+        assert run.info.run_name == f"tiny/seed-{seed}" and run.data.tags["sweep"] == "tiny"
         m = rec["metrics"]
         assert m["threshold"] == meta["threshold"] and m["best_epoch"] == meta["best_epoch"]
         assert m["test.f1"] == enc["metrics"]["f1"] and m["test.fpr"] == enc["metrics"]["fpr"]
@@ -48,6 +57,9 @@ def test_T9_sweep_writes_seed_dirs_and_report(tiny_workdir, tiny_base_model):
         assert m["golden.benign_imperative_fp"] == enc["golden"]["benign_imperative"]["fp"]
         assert m["golden.benign_imperative_n"] == 1
     assert report["aggregate"]["test.f1"]["n"] == 2
+    a, b = report["per_seed"]
+    assert a["metrics"]["threshold"] != b["metrics"]["threshold"]  # control: the two seeds are distinguishable
+    assert report["provenance"]["golden_sha256"] == sha256_file(Path("golden/zh-tw.jsonl"))
     assert not list(Path("reports").glob("tiny-seed-*"))  # per-seed reports stay in the seed dir
 
 
@@ -81,8 +93,18 @@ def test_T11_missing_data_fails_closed(tiny_workdir, capsys):
     assert not Path("artifacts/sweep").exists() and not Path("reports/x.json").exists()
 
 
-@pytest.mark.parametrize("argv", [["--seeds", "1", "--name", "a/b"], ["--seeds", "1", "1", "--name", "x"]])
+@pytest.mark.parametrize("argv", [["--seeds", "1", "--name", n] for n in ("a/b", ".", "..", ".hidden")]
+                         + [["--seeds", "1", "1", "--name", "x"]])
 def test_T11_bad_name_or_duplicate_seed_fails(tiny_workdir, argv, capsys):
     assert main(["sweep", *argv, "--no-mlflow"]) == 2
     assert "error:" in capsys.readouterr().err
     assert not Path("artifacts/sweep").exists()
+
+
+def test_T11_name_with_inner_dot_is_valid(tiny_workdir, monkeypatch):
+    calls = []
+    monkeypatch.setattr("heimdall.encoder.train", lambda *a, **k: calls.append(k) or {})
+    monkeypatch.setattr("heimdall.evaluate.evaluate", lambda *a, **k: (_ for _ in ()).throw(SystemExit(0)))
+    with pytest.raises(SystemExit):  # control: the name check passes and training starts
+        sw.sweep("m1.v2", [1], track=False)
+    assert calls[0]["artifact_dir"] == Path("artifacts/sweep/m1.v2/seed-1")
