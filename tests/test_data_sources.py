@@ -1,5 +1,6 @@
 """R1.2, R1.11 (and B1): fail closed on licence, allow-list, download and revision problems."""
 
+import hashlib
 import json
 import re
 import tomllib
@@ -127,6 +128,8 @@ def test_R1_14_real_config_translates_the_unused_dolly_rows_from_a_committed_fil
     assert sources[tr["derived_from"]]["sample"] == 3000 and tr["sample"] == 2000
     assert tr["translation_file"] == "sources/dolly-zh-hant.jsonl"
     assert (REPO / tr["translation_file"]).exists() and (REPO / "sources" / "dolly-zh-hant.NOTICE").exists()
+    assert hashlib.sha256((REPO / tr["translation_file"]).read_bytes()).hexdigest() == tr["translation_sha256"]
+    assert "@gmail.com" not in (REPO / tr["translation_file"]).read_text(encoding="utf-8")
     assert tr["fixed_label"] == "safe" and tr["lang"] == "zh-Hant" and "opencc" not in tr
     assert tr["split_by_hash"] == ["train", "val", "test"]
     for line in (REPO / tr["translation_file"]).read_text(encoding="utf-8").splitlines():

@@ -7,7 +7,7 @@
 # optional sample (deterministic: smallest ids), split_by_hash ([train, val] default, or [train, val, test]),
 # translation_of + translation_block + opencc for row-aligned translations (B6).
 # Derived translated source (B12, B13): derived_from (an earlier sampled source; nothing is downloaded),
-# translation_file (committed JSONL of {source_sha256, text}), sample, optional translation_exclude
+# translation_file (committed JSONL of {source_sha256, text}), translation_sha256 (pins that file), sample, optional translation_exclude
 # (source_sha256 -> reason) for selected texts that deliberately have no translation. No revision.
 
 [[source]]
@@ -85,6 +85,7 @@ allowed = true
 use = "zh-Hant hard negatives: the 2000 Dolly instructions after the 3000 sampled above (by id), translated by an LLM used only as a translator; committed file, joined by source_sha256"
 derived_from = "databricks/databricks-dolly-15k"
 translation_file = "sources/dolly-zh-hant.jsonl"
+translation_sha256 = "c99b57e99950e421b02f8490c03b8cf499a55a39b78339f1d7286e1754c59948"
 fixed_label = "safe"
 lang = "zh-Hant"
 sample = 2000
@@ -92,3 +93,4 @@ split_by_hash = ["train", "val", "test"]
 
 [source.translation_exclude]
 d5a6b23c925d847593f62cffd96e2d7765a6bf1b8d111bac318c56134a863e4c = "not translated: the instruction quotes song lyrics, which the translator declined to reproduce"
+33a4e10543d052ec4cdb6e1bf341ecbe48485b9e00ad36f931b6106d59ee5f62 = "contains an email address"

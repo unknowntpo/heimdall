@@ -10,7 +10,7 @@ import random
 import time
 from pathlib import Path
 
-from heimdall.data import DATA_DIR, load_jsonl
+from heimdall.data import DATA_DIR, git_commit, load_jsonl, sha256_file
 from heimdall.metrics import binary_metrics, choose_threshold, labels_at
 
 BASE_MODEL = "distilbert/distilbert-base-multilingual-cased"
@@ -60,11 +60,18 @@ def score_texts(model, tok, texts: list[str], device, batch_size: int = 32) -> l
     return out
 
 
+def training_provenance(data_dir: Path = DATA_DIR) -> dict:
+    """B15: the git commit and the sha256 of the train and val files used for training."""
+    return {"git_commit": git_commit(), "train_sha256": sha256_file(Path(data_dir) / "train.jsonl"),
+            "val_sha256": sha256_file(Path(data_dir) / "val.jsonl")}
+
+
 def _train_on(device, epochs: int, batch_size: int, lr: float) -> dict:
     import torch
     from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
     set_seed(SEED)
+    provenance = training_provenance(DATA_DIR)
     train = load_jsonl(DATA_DIR / "train.jsonl")
     val = load_jsonl(DATA_DIR / "val.jsonl")
     tok = AutoTokenizer.from_pretrained(BASE_MODEL)
@@ -131,6 +138,7 @@ def _train_on(device, epochs: int, batch_size: int, lr: float) -> dict:
         "train_seconds": round(train_seconds, 1),
         "epochs": epochs, "batch_size": batch_size, "lr": lr, "seed": SEED, "max_len": MAX_LEN,
         "n_train": len(train), "n_val": len(val),
+        **provenance,
     }
     (ARTIFACT_DIR / "heimdall_meta.json").write_text(json.dumps(meta, indent=2) + "\n")
     print(f"best epoch={best['epoch']} threshold={threshold:.4f} val F1@thr={vm['f1']:.3f} "

@@ -43,7 +43,6 @@
 {"source_sha256": "52a9bfb0fb7760b6d99f75435b6938e411ebfbf709b70573bead991b49f68054", "text": "如果我住在美國，請建議我春假可以去哪裡。"}
 {"source_sha256": "62a30c04fed13859b1f6a5aa266e08f8bd8ff7cc8a0adf8e2ae88ac9697832a8", "text": "Koenigsfeld 在哪裡"}
 {"source_sha256": "9d75d404b9dfc3b1129478387fa1e09a725f9084db5bd530dbef6f956515c05a", "text": "請判斷哪一個是鳥或魚：Red snapper 或 Red kite"}
-{"source_sha256": "33a4e10543d052ec4cdb6e1bf341ecbe48485b9e00ad36f931b6106d59ee5f62", "text": "請偵測並遮蔽以下文字中的個人可識別資訊（PII）：\n「我叫 Joe Smith，電子郵件地址是 joesmith9999@gmail.com。我想為 Vizio 的 55 吋 OLED 電視留下評論。它的畫質很棒，但我在牆上安裝時遇到困難。」\n請以下列格式回傳 JSON 結果：\n{\n  \"original_text\": <原始文字>, \n  \"masked_text\": <已遮蔽 PII 的文字>\", \n  \"pii_detected\": [{\"pii_type\": <PII 的類型>, \"value\": <PII 文字值>}]\n}"}
 {"source_sha256": "624dde41cb64f0b837d05f0a86c8e4ade0182e8bc9829cadb90d3c4a4071605e", "text": "我不信任你"}
 {"source_sha256": "8c573fd10b7e1ad1944b0d7507490f77a602fb98fb5157553fd0ccdbc40420f5", "text": "為什麼嬰兒會哭？"}
 {"source_sha256": "3c899fb24e0cf0ef5fe2794ad5fa633e24400ca950b914f329282978d0d855f5", "text": "企業軟體公司可以採取哪些方式來降低成本？"}
