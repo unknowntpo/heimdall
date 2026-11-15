@@ -16,6 +16,7 @@ ACCEPTED = {
     "Lakera/gandalf_ignore_instructions",
     "databricks/databricks-dolly-15k",
     "rikka-snow/prompt-injection-multilingual",
+    "databricks/databricks-dolly-15k#mt-zh-Hant",
 }
 
 
@@ -113,3 +114,14 @@ def test_R1_2_real_config_lists_exactly_the_accepted_pinned_sources():
     for s in tomllib.loads(path.read_text())["source"]:
         assert re.fullmatch(r"[0-9a-f]{40}", s["revision"]), s["id"]
         assert s["license"] and s["allowed"] is True
+
+
+def test_R1_14_real_config_mt_source_translates_the_unused_dolly_rows_with_a_pinned_permissive_model():
+    sources = {s["id"]: s for s in load_config(REPO / "configs" / "sources.toml")}
+    mt = sources["databricks/databricks-dolly-15k#mt-zh-Hant"]
+    assert mt["mt_of"] == "databricks/databricks-dolly-15k"
+    assert sources[mt["mt_of"]]["sample"] == 3000 and mt["sample"] == 2000
+    assert mt["mt_model"] == "Helsinki-NLP/opus-mt-en-zh"
+    assert mt["revision"] == "408d9bc410a388e1d9aef112a2daba955b945255"
+    assert mt["opencc"] == "s2twp" and mt["fixed_label"] == "safe" and mt["lang"] == "zh-Hant"
+    assert mt["split_by_hash"] == ["train", "val", "test"]

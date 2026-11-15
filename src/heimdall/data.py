@@ -88,7 +88,7 @@ def load_config(path: Path) -> list[dict]:
     sources = tomllib.loads(Path(path).read_text(encoding="utf-8")).get("source", [])
     if not sources:
         raise PipelineError(f"{path}: no [[source]] entries")
-    seen = []
+    seen = {}
     for s in sources:
         sid = s.get("id") or "<missing id>"
         if not isinstance(s.get("license"), str) or not s["license"].strip():
@@ -97,11 +97,19 @@ def load_config(path: Path) -> list[dict]:
             raise PipelineError(f"{sid}: allowed is not true in {path}")
         if not re.fullmatch(r"[0-9a-f]{40}", str(s.get("revision", ""))):
             raise PipelineError(f"{sid}: revision must be a 40-hex commit sha")
-        files = s.get("files") or {}
-        if not files or set(files) - set(UPSTREAM_SPLITS):
-            raise PipelineError(f"{sid}: files must map {UPSTREAM_SPLITS} splits to paths")
-        if s.get("format") not in ("parquet", "csv", "jsonl") or not s.get("text") or not s.get("lang"):
-            raise PipelineError(f"{sid}: format, text and lang are required")
+        if s.get("mt_of"):  # B12: derived source, nothing is downloaded for it
+            base = seen.get(s["mt_of"])
+            if base is None or base.get("mt_of") or not base.get("sample"):
+                raise PipelineError(f"{sid}: mt_of must name an earlier, sampled, downloaded source")
+            if not (s.get("mt_model") and s.get("opencc") and s.get("fixed_label") and s.get("lang")
+                    and isinstance(s.get("sample"), int) and s["sample"] > 0):
+                raise PipelineError(f"{sid}: mt_model, opencc, fixed_label, lang and sample are required")
+        else:
+            files = s.get("files") or {}
+            if not files or set(files) - set(UPSTREAM_SPLITS):
+                raise PipelineError(f"{sid}: files must map {UPSTREAM_SPLITS} splits to paths")
+            if s.get("format") not in ("parquet", "csv", "jsonl") or not s.get("text") or not s.get("lang"):
+                raise PipelineError(f"{sid}: format, text and lang are required")
         if bool(s.get("fixed_label")) == bool(s.get("label_map")):
             raise PipelineError(f"{sid}: set exactly one of fixed_label or label + label_map")
         if s.get("split_by_hash", ["train", "val"]) not in (["train", "val"], ["train", "val", "test"]):
@@ -110,7 +118,7 @@ def load_config(path: Path) -> list[dict]:
             raise PipelineError(f"{sid}: translation_of must name an earlier source")
         if sid in seen:
             raise PipelineError(f"{sid}: listed twice")
-        seen.append(sid)
+        seen[sid] = s
     return sources
 
 
@@ -161,6 +169,13 @@ def normalise_source(src: dict, raw: dict[str, list[dict]], raws: dict[str, dict
     """Map one source's raw rows to schema rows. Rows with empty text are rejected (B2)."""
     if src.get("translation_of"):
         return _translation_rows(src, raw, raws[src["translation_of"]])
+    rows = _source_rows(src, raw)
+    if src.get("sample"):  # deterministic sample: smallest ids
+        rows = sorted(rows, key=lambda r: r["id"])[: src["sample"]]
+    return rows
+
+
+def _source_rows(src: dict, raw: dict[str, list[dict]]) -> list[dict]:
     rows = []
     for split, items in raw.items():
         for r in items:
@@ -168,8 +183,6 @@ def normalise_source(src: dict, raw: dict[str, list[dict]], raws: dict[str, dict
                 rows.append(make_row(r[src["text"]], _label(src, r), src["id"], split, _lang(src, r[src["text"]] or "")))
             except ValueError:
                 continue
-    if src.get("sample"):  # deterministic sample: smallest ids
-        rows = sorted(rows, key=lambda r: r["id"])[: src["sample"]]
     return rows
 
 
@@ -203,6 +216,132 @@ def _translation_rows(src: dict, raw: dict, orig: dict) -> list[dict]:
             except ValueError:
                 continue
     return rows
+
+
+# ---------- machine-translated negatives (B12, B13) ----------
+
+MT_CACHE = "mt-cache"
+MT_DECODING = {"do_sample": False, "num_beams": 4}  # deterministic: beam search, no sampling
+MT_BATCH = 16
+MT_FILES = ["config.json", "generation_config.json", "pytorch_model.bin", "source.spm", "target.spm",
+            "vocab.json", "tokenizer_config.json"]
+MT_DROP_REASONS = ("too_long", "empty", "identical", "no_cjk")
+_CJK = re.compile(r"[㐀-䶿一-鿿豈-﫿]")
+
+
+def mt_source_texts(src: dict, base: dict, raw: dict[str, list[dict]]) -> list[str]:
+    """B12: the base rows its own sample did not use. Sort by id, skip the ids of the first
+    base["sample"] rows, take the next src["sample"]."""
+    rows = sorted(_source_rows(base, raw), key=lambda r: r["id"])
+    used = {r["id"] for r in rows[: base["sample"]]}
+    return [r["text"] for r in rows[base["sample"]:] if r["id"] not in used][: src["sample"]]
+
+
+def _mt_source_sha(src: dict, texts: list[str]) -> str:
+    """Hash of everything that determines the MT output apart from the model revision."""
+    payload = json.dumps({"texts": texts, "prefix": src.get("mt_prefix", ""), "decoding": MT_DECODING},
+                         ensure_ascii=False, sort_keys=True)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def machine_translate(src: dict, texts: list[str], translate, cache_dir: Path, prev_lock: dict | None
+                      ) -> tuple[list[str | None], dict]:
+    """B13: read the MT cache or call `translate(src, texts) -> (model revision, outputs)`, where an output
+    is None when the source exceeds the model's maximum input length. Fails closed on a revision
+    mismatch, a cache that does not hold these texts, or an output sha256 that differs from the lock."""
+    sid, rev = src["id"], src["revision"]
+    source_sha = _mt_source_sha(src, texts)
+    name = f"{src['mt_model'].replace('/', '__')}@{rev}-{source_sha[:16]}.jsonl"
+    path = Path(cache_dir) / name
+    fresh = not path.exists()
+    if not fresh:
+        blob = path.read_bytes()
+        try:
+            cached = [json.loads(line) for line in blob.decode("utf-8").splitlines() if line.strip()]
+            outs = [c["mt"] for c in cached]
+            ok = [c["source"] for c in cached] == texts
+        except (ValueError, KeyError, TypeError):
+            ok = False
+        if not ok:
+            raise PipelineError(f"{sid}: MT cache {name} does not hold the texts to translate")
+    else:
+        if translate is None:
+            raise PipelineError(f"{sid}: no translator given and no MT cache {name}")
+        try:
+            got_rev, outs = translate(src, texts)
+        except Exception as e:  # noqa: BLE001 - any MT error must stop the pipeline
+            raise PipelineError(f"{sid}: translation failed: {e}") from e
+        if got_rev != rev:
+            raise PipelineError(f"{sid}: resolved MT model revision {got_rev} does not match configured {rev}")
+        if not isinstance(outs, list) or len(outs) != len(texts):
+            raise PipelineError(f"{sid}: translator must return one output per text ({len(texts)})")
+        blob = "".join(json.dumps({"source": t, "mt": o}, ensure_ascii=False) + "\n"
+                       for t, o in zip(texts, outs, strict=True)).encode("utf-8")
+    if not all(o is None or isinstance(o, str) for o in outs):
+        raise PipelineError(f"{sid}: MT outputs must be strings or null")
+    translated_sha = hashlib.sha256(blob).hexdigest()
+    prev = (((prev_lock or {}).get("sources") or {}).get(sid) or {}).get("mt") or {}
+    if (prev.get("model_revision") == rev and prev.get("source_sha256") == source_sha
+            and prev.get("translated_sha256") != translated_sha):
+        raise PipelineError(f"{sid}: MT output sha256 {translated_sha} differs from "
+                            f"{prev.get('translated_sha256')} in the lock file")
+    if fresh:
+        Path(cache_dir).mkdir(parents=True, exist_ok=True)
+        tmp = path.with_name(f".{name}.tmp")
+        tmp.write_bytes(blob)
+        os.replace(tmp, path)
+    print(f"mt {sid}: {'translated' if fresh else 'cache hit'} {len(texts)} texts -> {name}")
+    return outs, {"model": src["mt_model"], "model_revision": rev, "source_sha256": source_sha,
+                  "translated_sha256": translated_sha, "cache_file": name, "selected": len(texts)}
+
+
+def mt_rows(src: dict, texts: list[str], outs: list[str | None]) -> tuple[list[dict], dict]:
+    """B12: OpenCC-convert each output; drop (and count) too long, empty, identical and no-CJK rows."""
+    from opencc import OpenCC
+
+    conv = OpenCC(src["opencc"])
+    rows, dropped = [], dict.fromkeys(MT_DROP_REASONS, 0)
+    for text, out in zip(texts, outs, strict=True):
+        zh = conv.convert(out) if out is not None else None
+        if zh is None:
+            dropped["too_long"] += 1
+        elif not normalise(zh):
+            dropped["empty"] += 1
+        elif normalise(zh) == normalise(text):
+            dropped["identical"] += 1
+        elif not _CJK.search(zh):
+            dropped["no_cjk"] += 1
+        else:
+            rows.append(make_row(zh, src["fixed_label"], src["id"], "train", src["lang"]))
+    return rows, dropped
+
+
+def hub_translate(src: dict, texts: list[str], sizes: dict | None = None) -> tuple[str, list[str | None]]:
+    """The real translator: the pinned MT model from the Hub, run locally on CPU. Sources longer than
+    the model's maximum input length are not truncated; their output is None."""
+    import torch
+    from huggingface_hub import HfApi, snapshot_download
+    from transformers import MarianMTModel, MarianTokenizer
+
+    mid, rev = src["mt_model"], src["revision"]
+    info = HfApi().model_info(mid, revision=rev, files_metadata=True)
+    local = snapshot_download(mid, revision=rev, allow_patterns=MT_FILES)
+    if sizes is not None:
+        sizes.update({f"{mid}/{s.rfilename}": s.size or 0 for s in info.siblings if s.rfilename in MT_FILES})
+    tok = MarianTokenizer.from_pretrained(local)
+    model = MarianMTModel.from_pretrained(local).to("cpu").eval()
+    max_len = min(tok.model_max_length, model.config.max_position_embeddings)
+    prefix = src.get("mt_prefix", "")
+    todo = [i for i, t in enumerate(texts) if len(tok(prefix + t)["input_ids"]) <= max_len]
+    outs: list[str | None] = [None] * len(texts)
+    with torch.inference_mode():
+        for b in range(0, len(todo), MT_BATCH):
+            idx = todo[b:b + MT_BATCH]
+            enc = tok([prefix + texts[i] for i in idx], return_tensors="pt", padding=True)
+            gen = model.generate(**enc, **MT_DECODING, max_length=max_len)
+            for i, out in zip(idx, tok.batch_decode(gen, skip_special_tokens=True), strict=True):
+                outs[i] = out
+    return info.sha, outs
 
 
 # ---------- near-duplicates (B3) ----------
@@ -443,11 +582,20 @@ def _stats(splits: dict[str, list[dict]]) -> dict:
 # ---------- pipeline ----------
 
 def run(config_path: Path, fetch, golden_rows: list[dict], out_dir: Path = DATA_DIR,
-        lock_path: Path = LOCK_PATH, test_min: int = TEST_MIN, val_min: int = VAL_MIN) -> dict:
+        lock_path: Path = LOCK_PATH, test_min: int = TEST_MIN, val_min: int = VAL_MIN,
+        translate=None, cache_dir: Path | None = None) -> dict:
     sources = load_config(config_path)
     validate_golden(golden_rows)
+    try:
+        prev_lock = json.loads(Path(lock_path).read_text(encoding="utf-8")) if Path(lock_path).exists() else None
+    except ValueError as e:
+        raise PipelineError(f"{lock_path}: unreadable lock file: {e}") from e
+    cache_dir = Path(cache_dir) if cache_dir else Path(out_dir) / MT_CACHE
+    by_id = {s["id"]: s for s in sources}
     raws = {}
     for src in sources:
+        if src.get("mt_of"):  # derived source: nothing to download (B12)
+            continue
         try:
             rev, raw = fetch(src)
         except Exception as e:  # noqa: BLE001 - any download error must stop the pipeline
@@ -458,6 +606,16 @@ def run(config_path: Path, fetch, golden_rows: list[dict], out_dir: Path = DATA_
 
     rows, per_source, dropped = [], {}, []
     for src in sources:
+        if src.get("mt_of"):
+            base = by_id[src["mt_of"]]
+            texts = mt_source_texts(src, base, raws[base["id"]])
+            outs, mt_info = machine_translate(src, texts, translate, cache_dir, prev_lock)
+            rs, mt_dropped = mt_rows(src, texts, outs)
+            per_source[src["id"]] = {"revision": src["revision"], "license": src["license"],
+                                     "raw_rows": len(texts), "rows_after_normalise": len(rs),
+                                     "mt": {**mt_info, "dropped": mt_dropped}}
+            rows += rs
+            continue
         rs = normalise_source(src, raws[src["id"]], raws)
         if src.get("translation_of") and not rs:
             dropped.append(src["id"])
@@ -505,10 +663,13 @@ def prepare(config_path: Path = CONFIG_PATH, out_dir: Path = DATA_DIR, lock_path
         raise PipelineError(f"{golden_path} not found; the golden set is required (B8)")
     t0 = time.perf_counter()
     sizes: dict[str, int] = {}
-    lock = run(config_path, partial(hub_fetch, sizes=sizes), load_jsonl(golden_path), out_dir, lock_path)
+    lock = run(config_path, partial(hub_fetch, sizes=sizes), load_jsonl(golden_path), out_dir, lock_path,
+               translate=partial(hub_translate, sizes=sizes))
     elapsed = time.perf_counter() - t0
     for sid, info in lock["sources"].items():
         print(f"source {sid}: raw={info['raw_rows']} normalised={info['rows_after_normalise']}")
+        if "mt" in info:
+            print(f"      mt dropped={info['mt']['dropped']} translated_sha256={info['mt']['translated_sha256']}")
     print(f"dropped sources: {lock['dropped_sources'] or 'none'}")
     print(f"removed: {json.dumps(lock['removed'])}")
     for s in SPLITS:
