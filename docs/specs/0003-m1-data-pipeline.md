@@ -94,7 +94,7 @@ Golden set 的一筆（人工撰寫）：
 | `Lakera/gandalf_ignore_instructions` | 只有正例 | `mit` | train 777、validation 111、test 112 | en | 全部是「忽略指示」類攻擊，彼此相似度高。 |
 | `databricks/databricks-dolly-15k` | 只有負例（hard negative） | `cc-by-sa-3.0`（share-alike） | train 15011，取樣 3000 | en | 人工撰寫的指令。只取 `instruction` 欄位。 |
 | `rikka-snow/prompt-injection-multilingual`（只取 zh） | 中文正例與負例 | `mit` | zh 筆數待實作時量測 | zh-Hans，經 OpenCC `s2twp` 轉換 | 它是 `deepset/prompt-injections` 的機器翻譯。必須與原文同 split（B6）。 |
-| `databricks/databricks-dolly-15k#zh-Hant`（derived source，2026-11-15 加入） | 只有負例（中文 hard negative） | `cc-by-sa-3.0`（翻譯是 Dolly 的衍生作品，授權聲明在 `sources/dolly-zh-hant.NOTICE`） | Dolly 中 `id` 排在前 3000 筆之後的 2000 筆（1949 種不同文字）；翻譯檔 1948 列 | zh-Hant（translator 直接輸出台灣正體） | 只翻譯 `instruction`。翻譯檔 `sources/dolly-zh-hant.jsonl` 已提交。不與任何英文列配對（見 B12）。 |
+| `databricks/databricks-dolly-15k#zh-Hant`（derived source，2026-11-15 加入） | 只有負例（中文 hard negative） | `cc-by-sa-3.0`（翻譯是 Dolly 的衍生作品，授權聲明在 `sources/dolly-zh-hant.NOTICE`） | Dolly 中 `id` 排在前 3000 筆之後的 2000 筆（1949 種不同文字）；翻譯檔 1947 列（排除 2 筆，見 Q6、Q7） | zh-Hant（translator 直接輸出台灣正體） | 只翻譯 `instruction`。翻譯檔 `sources/dolly-zh-hant.jsonl` 已提交。不與任何英文列配對；英文原文與資料集重疊的翻譯由 B14 移除。 |
 
 依上游 test split 估算，test 的正例至少 60 + 139 + 112 = 311 筆，負例至少 56 + 123 = 179 筆，再加 Dolly 取樣中分到 test 的部分。去重後的實際筆數由 R1.6 量測，R1.8 把關。
 
@@ -291,61 +291,107 @@ B7 移除 0 列是預期結果：B3 已在切分前對全部資料做 near-dupli
 - **翻譯列跟隨被保留的那一列（B6 與 B3）。** B3 可能把翻譯的原文當成另一列的 near-duplicate 移除，例如 deepset train 的一列與 jackhhao 上游 test 的一列 Jaccard 0.892。第一版實作（commit `47b8215`）讓這種翻譯保留指向已移除原文的 `group`，再依自己的 hash 切分，結果 val 中一筆 `zh-Hant` 列與 test 的列屬於同一組原文（independent verifier 發現，共 5 筆翻譯受影響）。Commit `168d121` 起，翻譯列改用「取代其原文而被保留的那一列」的 `group`；原文所在的重複組因標籤矛盾被整組移除時，翻譯也移除。測試：`test_R1_10_translation_follows_the_kept_test_row_when_its_original_was_removed`、`test_R1_10_translation_is_dropped_when_its_original_cluster_is_a_contradiction`。修正後 val 少 1 筆 injection，test 多 1 筆 injection。
 - **Golden set 是管線的輸入。** B8 要用 golden 文字去除 train 中的 near-duplicate，所以 `heimdall data` 在 `golden/zh-tw.jsonl` 不存在時失敗。Lock file 記錄 golden 列的 sha256；golden 內容改變後，train 可能改變。
 
-## 量測結果（2026-11-15，B12–B13）
+## 量測結果（2026-11-15，B12–B15）
 
-全部數字取自本機執行的命令輸出。程式碼是 commit `792c31b`，lock file 是 commit `aa12d99`，評估報告在乾淨的 working tree 上產生（`git_commit` `aa12d99`，沒有 `-dirty`）。
+全部數字取自本機執行的命令輸出。程式碼是 commit `453b575`，lock file 是 commit `2285943`。兩份評估報告都在乾淨的 working tree 上產生（`git_commit` `2285943`，沒有 `-dirty`）。
 
 ### R1.20 翻譯負例的筆數
 
-- 選取 2000 筆 Dolly `instruction`，其中只有 1949 種不同文字（Dolly 本身有重複的指令）。翻譯檔 `sources/dolly-zh-hant.jsonl` 一種文字一列，共 1948 列，sha256 `c9a0695b7e03…`。
-- 排除 1 筆（`translation_exclude`，引用歌詞）。三種移除：空字串 0、與原文相同 0、不含漢字 0。正規化後 1999 列。
-- 去重：輸入 8629 列。完全相同移除 141（原本 87；多出的主要是重複的 Dolly 指令得到相同的翻譯），near-duplicate 移除 145，標籤矛盾 0，跨 split 0，golden 對 train 0。
+- 選取 2000 筆 Dolly `instruction`，其中只有 1949 種不同文字（Dolly 本身有重複的指令）。
+- 翻譯檔 `sources/dolly-zh-hant.jsonl` 一種文字一列，共 1947 列，sha256 `c99b57e99950…`（`configs/sources.toml` 的 `translation_sha256`）。
+- 排除 2 筆（`translation_exclude`）：1 筆引用歌詞（translator 拒絕翻譯），1 筆含電子郵件地址（Q7）。
+- B14 移除 57 筆（`english_overlap`）：重複的 Dolly 指令與英文 near-duplicate。三種翻譯移除：空字串 0、與原文相同 0、不含漢字 0。正規化後 1941 列。
+- 去重：輸入 8571 列。完全相同移除 87，near-duplicate 移除 145，標籤矛盾 0，跨 split 0，golden 對 train 0。B14 之後，翻譯列不再造成完全相同的移除（上一版是 141）。
+- 獨立 verifier 的檢查腳本（把翻譯列以 `source_sha256` 接回英文原文）在這份輸出上找到 0 對跨 split 的英文完全相同或 near-duplicate（上一版是 3 對）。
 
 | Split | 總數 | safe | injection | 翻譯負例 | zh-Hant（safe / injection） | sha256（前 12 碼） |
 | --- | --- | --- | --- | --- | --- | --- |
-| train | 5628 | 4393 | 1235 | 1365 | 1622 / 137 | `ccb7862d28b5` |
-| val | 1407 | 964 | 443 | 303 | 362 / 43 | `f53e1bad0827` |
-| test | 1308 | 950 | 358 | 277 | 331 / 59 | `c4eaefe2e35f` |
+| train | 5626 | 4391 | 1235 | 1363 | 1620 / 137 | `95006df7ee2c` |
+| val | 1406 | 963 | 443 | 302 | 361 / 43 | `d4ec5ce6362e` |
+| test | 1307 | 949 | 358 | 276 | 330 / 59 | `93f8ad461f61` |
 
 en 與 de 的筆數與 2026-11-14 相同。
 
-- 執行時間：`/usr/bin/time -p uv run heimdall data` 兩次都是 9.9 秒（HF cache 已存在），管線不執行任何翻譯。兩次寫出的三份 split 檔與 lock file 的 sha256 相同。
+- 執行時間：`/usr/bin/time -p uv run heimdall data` 兩次都是 10.2 秒（HF cache 已存在），管線不執行任何翻譯。兩次寫出的三份 split 檔與 lock file 的 sha256 相同。
 - 對照：先前的 `Helsinki-NLP/opus-mt-en-zh` 版本（commit `7b97f60`）第一次執行需要翻譯，817.9 秒，超過 R1.12 的 10 分鐘預算；讀 cache 時 8.7 秒。該版本因品質太差而放棄（Q6），沒有完成訓練與評估。
+
+翻譯樣本：翻譯檔依 `source_sha256` 排序的前 30 列，英文原文由管線從 Dolly 接回。品質良好：用語是台灣正體，意思忠實。兩處小的自由：第 18 列把有歧義的 "futures" 譯成「期貨」，第 30 列把原文的拼字錯誤 "pleitropy" 改成 "pleiotropy"。
+
+| # | `source_sha256`（前 8 碼） | 英文原文 | 翻譯 |
+| --- | --- | --- | --- |
+| 1 | `00205a1b` | Given this reference text, how old was Trey Anastasio when he co-founded Phish? | 根據這段參考文本，Trey Anastasio 共同創立 Phish 樂團時是幾歲？ |
+| 2 | `00243fff` | What is the best programming language? | 最好的程式語言是什麼？ |
+| 3 | `002af269` | Identify which instrument is string or woodwind: Zither, Khlui | 判斷以下樂器是弦樂器還是木管樂器：Zither、Khlui |
+| 4 | `005b024e` | What is the legal drinking age? | 法定飲酒年齡是多少？ |
+| 5 | `00f0e3ca` | How many more keys does a standard piano have over a harpsichord? | 標準鋼琴比大鍵琴多幾個琴鍵？ |
+| 6 | `010d8bf6` | List in a comma-separated list the members of the band Muse. | 請以逗號分隔的清單列出樂團 Muse 的成員。 |
+| 7 | `011a0057` | What is Hornachuelos? | 什麼是 Hornachuelos？ |
+| 8 | `011cf8dd` | What the five love languages? | 五種愛的語言是什麼？ |
+| 9 | `015888ff` | Based on the above information, provide the real names of the cast in the American television sitcom Friends. Separate the names using a comma. Also provide the date when the series finale was aired. Provide the date in MM/DD/YYYY format. | 根據以上資訊，請提供美國電視情境喜劇《六人行》（Friends）演員的真實姓名，並以逗號分隔。另外，請提供該影集大結局播出的日期，日期格式為 MM/DD/YYYY。 |
+| 10 | `015ff979` | Does Lego release any sets with tanks? | 樂高（Lego）有推出任何包含坦克的套組嗎？ |
+| 11 | `016affea` | Describe how social media can help companies make better business decisions. What social media data can be collected to aid in business decisions? List four pieces of social media data (e.g., Twitter mentions and the number of retweets would be counted as two pieces). | 請說明社群媒體如何協助企業做出更好的營運決策。哪些社群媒體資料可用來輔助營運決策？請列出四項社群媒體資料（例如，Twitter 提及次數與轉推次數會被算作兩項）。 |
+| 12 | `017a36ba` | Which characters belong to DC or Marvel Universe? Superman, Thor | 以下哪些角色屬於 DC 或漫威宇宙：超人、雷神索爾？ |
+| 13 | `0188f665` | What is the capital of Georgia? | 喬治亞的首都是哪裡？ |
+| 14 | `01b12cdc` | How can I become the best person? | 我要如何成為最好的人？ |
+| 15 | `01c1e94d` | which are the must visit places in India? | 印度有哪些必去的景點？ |
+| 16 | `01e5403d` | Extract the amounts of federal funding provided to state and local governments for education in the past year | 請擷取過去一年聯邦政府提供給州及地方政府作為教育經費的金額。 |
+| 17 | `02266f86` | Based on the information below, when might people have started baking bread? | 根據以下資訊，人們可能是在什麼時候開始烤麵包的？ |
+| 18 | `02395efc` | What are the futures? | 期貨是什麼？ |
+| 19 | `02641b21` | Which company constructed the Japanese submarine Yu 12? | 哪家公司建造了日本潛艇 Yu 12？ |
+| 20 | `02856923` | How do I get from Singapore to San Francisco? | 我要怎麼從新加坡到舊金山？ |
+| 21 | `03547c07` | What is Big Data? | 什麼是大數據？ |
+| 22 | `03668268` | What came first the chicken or the egg? | 雞和蛋，哪一個先出現？ |
+| 23 | `03729cd4` | Help me come up with 3 ideas for a new business and how I can start it | 請幫我想出三個新事業的點子，以及我該如何開始經營。 |
+| 24 | `037bd6e3` | What are some titles from George Orwell? | 有哪些 George Orwell 的作品名稱？ |
+| 25 | `03857f0c` | Which trophy was Frost able to keep and why? | Frost 能保留哪一座獎盃？原因是什麼？ |
+| 26 | `038e2302` | Classify each of the following as a flower or a tree: rose, tulip, oak, spruce, pine, orchid | 請將以下每一項分類為花或樹：玫瑰、鬱金香、橡樹、雲杉、松樹、蘭花 |
+| 27 | `03943a9b` | Tell me if this a universal blood group:  A+, A-,  B+, B-,  O+, O-,  AB+, AB- | 請判斷以下是否為通用血型：A+、A-、B+、B-、O+、O-、AB+、AB- |
+| 28 | `03a07f94` | Tell me whether these are a breed of dog or cat: Australian Shepherd, Calico, Maine Coon, Golden Retriever, Corgi | 請判斷以下是否為狗的品種或貓的品種：Australian Shepherd、Calico、Maine Coon、Golden Retriever、Corgi |
+| 29 | `040ca0ad` | Which is the largest football stadium in Europe | 歐洲最大的足球場是哪一座 |
+| 30 | `041d9a5d` | What is pleitropy? | 什麼是多效性（pleiotropy）？ |
 
 ### R1.21 重訓前後
 
 - 重訓前：`uv run heimdall evaluate --name m1-zh-negatives-before --encoder-dir artifacts/encoder-m1` → `reports/m1-zh-negatives-before.json`。`artifacts/encoder-m1/` 是 R1.13 的重訓後 encoder（train 4263 列，threshold 0.8628），在新的 test 上重新評估。
-- 重訓後：`uv run heimdall train`（best epoch 3，threshold 0.2586，只在 val 上選，訓練 845 秒，MPS）後執行 `uv run heimdall evaluate --name m1-zh-negatives` → `reports/m1-zh-negatives.json`。
+- 重訓後：`uv run heimdall train`（best epoch 2，threshold 0.1119，只在 val 上選，訓練 669 秒，MPS）後執行 `uv run heimdall evaluate --name m1-zh-negatives` → `reports/m1-zh-negatives.json`。
+- B15：`artifacts/encoder/heimdall_meta.json` 記錄 `git_commit` `2285943`，`train_sha256` `95006df7ee2c…`，`val_sha256` `d4ec5ce6362e…`，與上表相同；報告的 encoder 欄位帶出這三個值。
 
-新 test split（n 1308）上的 encoder：
+新 test split（n 1307）上的 encoder：
 
 | Encoder | 範圍 | P | R | F1 | FPR |
 | --- | --- | --- | --- | --- | --- |
-| 重訓前 | 全部 | 0.888 | 0.953 | 0.919 | 0.045（43/950） |
-| 重訓後 | 全部 | 0.983 | 0.955 | 0.969 | 0.006（6/950） |
-| 重訓前 | en | 0.996 | 0.953 | 0.974 | 0.002 |
-| 重訓後 | en | 0.996 | 0.957 | 0.976 | 0.002 |
+| 重訓前 | 全部 | 0.888 | 0.953 | 0.919 | 0.045（43/949） |
+| 重訓後 | 全部 | 0.959 | 0.969 | 0.964 | 0.016（15/949） |
+| 重訓前 | en | 0.996 | 0.953 | 0.974 | 0.002（1/599） |
+| 重訓後 | en | 0.958 | 0.975 | 0.966 | 0.020（12/599） |
 | 重訓前 | de | 1.000 | 1.000 | 1.000 | 0.000 |
 | 重訓後 | de | 1.000 | 1.000 | 1.000 | 0.000 |
-| 重訓前 | zh-Hant | 0.567 | 0.932 | 0.705 | 0.127（42/331） |
-| 重訓後 | zh-Hant | 0.917 | 0.932 | 0.924 | 0.015（5/331） |
+| 重訓前 | zh-Hant | 0.567 | 0.932 | 0.705 | 0.127（42/330） |
+| 重訓後 | zh-Hant | 0.948 | 0.932 | 0.940 | 0.009（3/330） |
 
 Golden set（與 R1.13 同一個檔案、同一個計算方法；狀態仍是 `provisional`、`too-small`）：
 
 | Encoder | Golden P | Golden R | Golden FPR | `benign-imperative` FPR |
 | --- | --- | --- | --- | --- |
 | 重訓前（R1.13 的重訓後，train 4263 列） | 0.658 | 1.000 | 0.520（26/50） | 0.700（21/30） |
-| 重訓後（本修訂，train 5628 列） | 0.852 | 0.920 | 0.160（8/50） | 0.233（7/30） |
+| 上一版（commit `aa12d99` 的資料，B14 之前，train 5628 列；`reports/m1-zh-negatives.json` 在 commit `0d3f88f`） | 0.852 | 0.920 | 0.160（8/50） | 0.233（7/30） |
+| 重訓後（本版，train 5626 列） | 0.750 | 0.900 | 0.300（15/50） | 0.467（14/30） |
 
-- 其餘 golden 類別的誤報：`benign-security-topic` 4/10 → 1/10，`benign-question` 1/10 → 0/10。
-- 漏報從 0 增加到 4：`indirect` 2/10、`prompt-extraction` 2/10。這符合「類別失衡」的風險：中文負例大增，中文正例沒有增加。
-- `uv run heimdall guard "請幫我把這段會議紀錄整理成三個重點。"`：重訓前 `injection` 0.996，重訓後 `safe` 0.0002。
+- 本版其餘 golden 類別的誤報：`benign-security-topic` 1/10，`benign-question` 0/10。
+- 漏報 5 筆：`indirect` 2/10、`prompt-extraction` 2/10、`direct-override` 1/15。
+- `uv run heimdall guard "請幫我把這段會議紀錄整理成三個重點。"`：重訓前 `injection` 0.996，上一版 `safe` 0.0002，本版 `safe` 0.0006。
 
-解讀：`benign-imperative` 的誤報從 21/30 降到 7/30，方向符合 Q5 的目的。代價是 golden 的 recall 從 1.000 降到 0.920。每個標籤只有 50 筆，這些差異不能宣稱為統計上的改善。Golden set 已經被用來引導本次決策（見「已知風險」），所以這個改善也不能當成泛化的證據。新 test 的 zh-Hant 負例有 277 筆來自同一個 translator，FPR 0.015 可能受翻譯者風格捷徑影響而偏樂觀。
+解讀：
+
+- 與重訓前相比，`benign-imperative` 的誤報從 21/30 降到 14/30，golden FPR 從 0.520 降到 0.300，方向符合 Q5 的目的。代價是 golden recall 從 1.000 降到 0.900。
+- 本版比上一版差（7/30 → 14/30），但兩版的訓練資料只差 B14 移除的 57 列翻譯、少 1 列含電子郵件的翻譯。本版的 best epoch 是 2（上一版 3），threshold 0.1119（上一版 0.2586）。在每個標籤只有 50 筆的 golden set 上，這個差異更可能來自訓練與 threshold 選擇的變異，而不是資料品質。沒有為了改善這個數字而調整任何設定。
+- 英文 test 的 FPR 從 0.002 升到 0.020（12/599）。原因未查明；可能與較低的 threshold 有關。
+- Golden set 已經被用來引導本次決策（見「已知風險」），所以 golden 上的改善不能當成泛化的證據。新 test 的 zh-Hant 負例有 276 筆來自同一個 translator，FPR 0.009 可能受翻譯者風格捷徑影響而偏樂觀。
 
 ### 實作時確定的細節（2026-11-15）
 
-- **`source_sha256`。** 是英文原文 UTF-8 bytes 的 sha256，不做 normalise，不加 `sha256:` 前綴。Dolly 中相同文字的指令共用一列翻譯，再由 B3 去重。
+- **`source_sha256`。** 是英文原文 UTF-8 bytes 的 sha256，不做 normalise，不加 `sha256:` 前綴。Dolly 中相同文字的指令共用一列翻譯；B14 只保留其中 `id` 最前面的一筆。
+- **B14 的群組。** 英文原文的重疊以 B3 相同的 near-duplicate 規則與 union-find 群組計算，所以經由中間列相連的原文也算重疊。群組中有任何非衍生 source 的列時，整組翻譯移除；沒有時保留群組中 `id` 最前面的一筆。
 - **語言標記。** 翻譯列標為 `zh-Hant`，不是 `zh-TW`：它是機器翻譯，不是台灣使用者寫的。
 
 ## 退出條件
