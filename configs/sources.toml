@@ -6,8 +6,9 @@
 # text (column), label + label_map or fixed_label, lang ("detect-en-de" = stop-word heuristic),
 # optional sample (deterministic: smallest ids), split_by_hash ([train, val] default, or [train, val, test]),
 # translation_of + translation_block + opencc for row-aligned translations (B6).
-# Derived MT source (B12, B13): mt_of (an earlier sampled source; nothing is downloaded), mt_model,
-# revision (the MT model's commit sha), mt_prefix (target-language token), opencc, sample.
+# Derived translated source (B12, B13): derived_from (an earlier sampled source; nothing is downloaded),
+# translation_file (committed JSONL of {source_sha256, text}), sample, optional translation_exclude
+# (source_sha256 -> reason) for selected texts that deliberately have no translation. No revision.
 
 [[source]]
 id = "deepset/prompt-injections"
@@ -78,16 +79,16 @@ translation_block = 1
 opencc = "s2twp"
 
 [[source]]
-id = "databricks/databricks-dolly-15k#mt-zh-Hant"
-revision = "408d9bc410a388e1d9aef112a2daba955b945255"
-license = "cc-by-sa-3.0 (machine translation of databricks/databricks-dolly-15k; MT model Helsinki-NLP/opus-mt-en-zh is apache-2.0 per its model card, checked 2026-11-15)"
+id = "databricks/databricks-dolly-15k#zh-Hant"
+license = "cc-by-sa-3.0 (translation of databricks/databricks-dolly-15k; see sources/dolly-zh-hant.NOTICE)"
 allowed = true
-use = "zh-Hant hard negatives: the 2000 Dolly instructions after the 3000 sampled above (by id), translated locally on CPU"
-mt_of = "databricks/databricks-dolly-15k"
-mt_model = "Helsinki-NLP/opus-mt-en-zh"
-mt_prefix = ">>cmn_Hans<< "
-opencc = "s2twp"
+use = "zh-Hant hard negatives: the 2000 Dolly instructions after the 3000 sampled above (by id), translated by an LLM used only as a translator; committed file, joined by source_sha256"
+derived_from = "databricks/databricks-dolly-15k"
+translation_file = "sources/dolly-zh-hant.jsonl"
 fixed_label = "safe"
 lang = "zh-Hant"
 sample = 2000
 split_by_hash = ["train", "val", "test"]
+
+[source.translation_exclude]
+d5a6b23c925d847593f62cffd96e2d7765a6bf1b8d111bac318c56134a863e4c = "not translated: the instruction quotes song lyrics, which the translator declined to reproduce"
