@@ -287,6 +287,64 @@ B7 移除 0 列是預期結果：B3 已在切分前對全部資料做 near-dupli
 - **翻譯列跟隨被保留的那一列（B6 與 B3）。** B3 可能把翻譯的原文當成另一列的 near-duplicate 移除，例如 deepset train 的一列與 jackhhao 上游 test 的一列 Jaccard 0.892。第一版實作（commit `47b8215`）讓這種翻譯保留指向已移除原文的 `group`，再依自己的 hash 切分，結果 val 中一筆 `zh-Hant` 列與 test 的列屬於同一組原文（independent verifier 發現，共 5 筆翻譯受影響）。Commit `168d121` 起，翻譯列改用「取代其原文而被保留的那一列」的 `group`；原文所在的重複組因標籤矛盾被整組移除時，翻譯也移除。測試：`test_R1_10_translation_follows_the_kept_test_row_when_its_original_was_removed`、`test_R1_10_translation_is_dropped_when_its_original_cluster_is_a_contradiction`。修正後 val 少 1 筆 injection，test 多 1 筆 injection。
 - **Golden set 是管線的輸入。** B8 要用 golden 文字去除 train 中的 near-duplicate，所以 `heimdall data` 在 `golden/zh-tw.jsonl` 不存在時失敗。Lock file 記錄 golden 列的 sha256；golden 內容改變後，train 可能改變。
 
+## 量測結果（2026-11-15，B12–B13）
+
+全部數字取自本機執行的命令輸出。程式碼是 commit `792c31b`，lock file 是 commit `aa12d99`，評估報告在乾淨的 working tree 上產生（`git_commit` `aa12d99`，沒有 `-dirty`）。
+
+### R1.20 翻譯負例的筆數
+
+- 選取 2000 筆 Dolly `instruction`，其中只有 1949 種不同文字（Dolly 本身有重複的指令）。翻譯檔 `sources/dolly-zh-hant.jsonl` 一種文字一列，共 1948 列，sha256 `c9a0695b7e03…`。
+- 排除 1 筆（`translation_exclude`，引用歌詞）。三種移除：空字串 0、與原文相同 0、不含漢字 0。正規化後 1999 列。
+- 去重：輸入 8629 列。完全相同移除 141（原本 87；多出的主要是重複的 Dolly 指令得到相同的翻譯），near-duplicate 移除 145，標籤矛盾 0，跨 split 0，golden 對 train 0。
+
+| Split | 總數 | safe | injection | 翻譯負例 | zh-Hant（safe / injection） | sha256（前 12 碼） |
+| --- | --- | --- | --- | --- | --- | --- |
+| train | 5628 | 4393 | 1235 | 1365 | 1622 / 137 | `ccb7862d28b5` |
+| val | 1407 | 964 | 443 | 303 | 362 / 43 | `f53e1bad0827` |
+| test | 1308 | 950 | 358 | 277 | 331 / 59 | `c4eaefe2e35f` |
+
+en 與 de 的筆數與 2026-11-14 相同。
+
+- 執行時間：`/usr/bin/time -p uv run heimdall data` 兩次都是 9.9 秒（HF cache 已存在），管線不執行任何翻譯。兩次寫出的三份 split 檔與 lock file 的 sha256 相同。
+- 對照：先前的 `Helsinki-NLP/opus-mt-en-zh` 版本（commit `7b97f60`）第一次執行需要翻譯，817.9 秒，超過 R1.12 的 10 分鐘預算；讀 cache 時 8.7 秒。該版本因品質太差而放棄（Q6），沒有完成訓練與評估。
+
+### R1.21 重訓前後
+
+- 重訓前：`uv run heimdall evaluate --name m1-zh-negatives-before --encoder-dir artifacts/encoder-m1` → `reports/m1-zh-negatives-before.json`。`artifacts/encoder-m1/` 是 R1.13 的重訓後 encoder（train 4263 列，threshold 0.8628），在新的 test 上重新評估。
+- 重訓後：`uv run heimdall train`（best epoch 3，threshold 0.2586，只在 val 上選，訓練 845 秒，MPS）後執行 `uv run heimdall evaluate --name m1-zh-negatives` → `reports/m1-zh-negatives.json`。
+
+新 test split（n 1308）上的 encoder：
+
+| Encoder | 範圍 | P | R | F1 | FPR |
+| --- | --- | --- | --- | --- | --- |
+| 重訓前 | 全部 | 0.888 | 0.953 | 0.919 | 0.045（43/950） |
+| 重訓後 | 全部 | 0.983 | 0.955 | 0.969 | 0.006（6/950） |
+| 重訓前 | en | 0.996 | 0.953 | 0.974 | 0.002 |
+| 重訓後 | en | 0.996 | 0.957 | 0.976 | 0.002 |
+| 重訓前 | de | 1.000 | 1.000 | 1.000 | 0.000 |
+| 重訓後 | de | 1.000 | 1.000 | 1.000 | 0.000 |
+| 重訓前 | zh-Hant | 0.567 | 0.932 | 0.705 | 0.127（42/331） |
+| 重訓後 | zh-Hant | 0.917 | 0.932 | 0.924 | 0.015（5/331） |
+
+Golden set（與 R1.13 同一個檔案、同一個計算方法；狀態仍是 `provisional`、`too-small`）：
+
+| Encoder | Golden P | Golden R | Golden FPR | `benign-imperative` FPR |
+| --- | --- | --- | --- | --- |
+| 重訓前（R1.13 的重訓後，train 4263 列） | 0.658 | 1.000 | 0.520（26/50） | 0.700（21/30） |
+| 重訓後（本修訂，train 5628 列） | 0.852 | 0.920 | 0.160（8/50） | 0.233（7/30） |
+
+- 其餘 golden 類別的誤報：`benign-security-topic` 4/10 → 1/10，`benign-question` 1/10 → 0/10。
+- 漏報從 0 增加到 4：`indirect` 2/10、`prompt-extraction` 2/10。這符合「類別失衡」的風險：中文負例大增，中文正例沒有增加。
+- `uv run heimdall guard "請幫我把這段會議紀錄整理成三個重點。"`：重訓前 `injection` 0.996，重訓後 `safe` 0.0002。
+
+解讀：`benign-imperative` 的誤報從 21/30 降到 7/30，方向符合 Q5 的目的。代價是 golden 的 recall 從 1.000 降到 0.920。每個標籤只有 50 筆，這些差異不能宣稱為統計上的改善。Golden set 已經被用來引導本次決策（見「已知風險」），所以這個改善也不能當成泛化的證據。新 test 的 zh-Hant 負例有 277 筆來自同一個 translator，FPR 0.015 可能受翻譯者風格捷徑影響而偏樂觀。
+
+### 實作時確定的細節（2026-11-15）
+
+- **`source_sha256`。** 是英文原文 UTF-8 bytes 的 sha256，不做 normalise，不加 `sha256:` 前綴。Dolly 中相同文字的指令共用一列翻譯，再由 B3 去重。
+- **Lock file 的固定方式。** Lock file 已有該 source 的翻譯檔 sha256 時，內容必須相同。Lock file 沒有紀錄時（第一次加入），管線接受並寫入。要更新翻譯檔，必須同時更新 lock file，並在 commit 中說明。
+- **語言標記。** 翻譯列標為 `zh-Hant`，不是 `zh-TW`：它是機器翻譯，不是台灣使用者寫的。
+
 ## 退出條件
 
 - R1.1–R1.11 的測試全部通過。
