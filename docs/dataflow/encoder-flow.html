@@ -1,0 +1,208 @@
+<meta charset="utf-8">
+<title>Encoder 與 PyTorch</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Cloudflare-pipeline style data flow: columns of narrow cards joined by elbow connectors; a detail panel below. Edit only the FLOW object in the script. */
+:root{
+  --bg:#f6f5f2; --surface:#ffffff; --sunk:#efede8; --line:#dcd8cf; --fg:#26252b; --mut:#6c6a72;
+  --fuji:#8a7cc0; --fuji-t:rgba(138,124,192,.12);      /* 藤: AI / model */
+  --seiji:#4f9a82; --seiji-t:rgba(79,154,130,.12);     /* 青磁: rule / deterministic */
+  --wasure:#4f8fbf; --wasure-t:rgba(79,143,191,.12);   /* 勿忘草: external source */
+  --koke:#7d8048; --koke-t:rgba(125,128,72,.14);       /* 苔: storage */
+  --beni:#b0485a; --beni-t:rgba(176,72,90,.10);        /* 薄紅: changing / warning */
+  --display:"Zen Kaku Gothic New","Noto Sans TC","PingFang TC",sans-serif;
+  --body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#18181c; --surface:#212127; --sunk:#1c1c21; --line:#34343c; --fg:#e8e6ee; --mut:#a3a0ab;
+  --fuji:#ada2dc; --fuji-t:rgba(173,162,220,.14); --seiji:#7cc3aa; --seiji-t:rgba(124,195,170,.13);
+  --wasure:#8ebfe4; --wasure-t:rgba(142,191,228,.13); --koke:#b7ba84; --koke-t:rgba(183,186,132,.13);
+  --beni:#e3909e; --beni-t:rgba(227,144,158,.12); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#18181c; --surface:#212127; --sunk:#1c1c21; --line:#34343c; --fg:#e8e6ee; --mut:#a3a0ab;
+  --fuji:#ada2dc; --fuji-t:rgba(173,162,220,.14); --seiji:#7cc3aa; --seiji-t:rgba(124,195,170,.13);
+  --wasure:#8ebfe4; --wasure-t:rgba(142,191,228,.13); --koke:#b7ba84; --koke-t:rgba(183,186,132,.13);
+  --beni:#e3909e; --beni-t:rgba(227,144,158,.12); color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:14px/1.6 var(--body);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 40px}
+.wrap{max-width:1180px;margin:0 auto;display:grid;gap:18px}
+header h1{font:700 1.45rem/1.3 var(--display);margin:0;text-wrap:balance}
+header p{margin:.3rem 0 0;color:var(--mut);max-width:70ch}
+.legend{display:flex;flex-wrap:wrap;gap:8px 14px;margin-top:10px;font-size:.8rem;color:var(--mut)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.dot{width:10px;height:10px;border-radius:3px;border:1px solid currentColor}
+.graph{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:22px;overflow-x:auto}
+.cols{position:relative;display:grid;column-gap:110px;justify-content:center;align-items:start;padding-block:6px}
+.links{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;color:var(--mut)}
+.links path{fill:none;stroke:currentColor;stroke-width:1.25}
+.col{display:grid;gap:40px;position:relative;z-index:1;align-content:start}
+.arrow{display:none;justify-self:center;color:var(--mut)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.card-h{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line);font:700 .95rem var(--display)}
+.count{font:500 .72rem var(--mono);background:var(--sunk);border:1px solid var(--line);border-radius:5px;padding:0 6px;color:var(--mut)}
+.sub{padding:6px 12px 2px;font-size:.74rem;letter-spacing:.06em;color:var(--mut)}
+.node{all:unset;box-sizing:border-box;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:8px;width:100%;padding:8px 12px;cursor:pointer;border-top:1px solid transparent}
+.node+.node{border-top-color:var(--line)}
+.node:hover{background:var(--sunk)}
+.node:focus-visible{outline:2px solid var(--fuji);outline-offset:-2px}
+.node[aria-pressed="true"]{background:var(--fuji-t);box-shadow:inset 3px 0 0 var(--fuji)}
+.ic{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;font:500 .7rem var(--mono);border:1px solid}
+.k-src{color:var(--wasure);background:var(--wasure-t)}
+.k-store{color:var(--koke);background:var(--koke-t)}
+.k-ai{color:var(--fuji);background:var(--fuji-t)}
+.k-rule{color:var(--seiji);background:var(--seiji-t)}
+.k-web{color:var(--mut);background:var(--sunk)}
+.k-warn{color:var(--beni);background:var(--beni-t)}
+.nm{min-width:0}
+.nm b{display:block;font-weight:500;font-size:.88rem}
+.nm small{display:block;color:var(--mut);font:400 .74rem var(--mono);overflow-wrap:anywhere}
+.tag{font-size:.68rem;border-radius:999px;padding:1px 7px;white-space:nowrap;border:1px solid}
+.tag.chg{color:var(--beni);background:var(--beni-t)}
+.tag.on{color:var(--seiji);background:var(--seiji-t)}
+.tag.off{color:var(--mut);background:var(--sunk)}
+.stat{display:flex;justify-content:space-between;gap:8px;padding:6px 12px;font-size:.8rem;border-top:1px solid var(--line)}
+.stat span:last-child{font:500 .78rem var(--mono);font-variant-numeric:tabular-nums}
+.detail{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px;display:grid;gap:12px}
+.detail h2{margin:0;font:700 1.15rem var(--display);display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.detail .lead{margin:0;max-width:72ch}
+.kv{display:grid;grid-template-columns:7.5em 1fr;gap:6px 14px;margin:0}
+.kv dt{color:var(--mut);font-size:.82rem}
+.kv dd{margin:0;min-width:0;overflow-wrap:anywhere}
+.kv code,.lead code{font:400 .8rem var(--mono);background:var(--sunk);border:1px solid var(--line);border-radius:4px;padding:0 4px}
+.change{border:1px solid var(--beni);background:var(--beni-t);border-radius:8px;padding:10px 12px;font-size:.88rem}
+.change b{color:var(--beni)}
+.hint{color:var(--mut);font-size:.8rem}
+@media (max-width:760px){
+  .cols{grid-template-columns:1fr !important;min-width:0 !important;row-gap:14px}
+  .col{gap:14px}
+  .links{display:none}
+  .arrow{display:block;transform:rotate(90deg);padding:2px 0}
+  .graph{padding:14px}
+  .kv{grid-template-columns:1fr}
+  .kv dt{margin-top:4px}
+}
+@media (prefers-reduced-motion:no-preference){.node{transition:background .15s}}
+</style>
+
+<div class="wrap">
+  <header><h1 id="title"></h1><p id="lead"></p><div class="legend" id="legend"></div></header>
+  <section class="graph" aria-label="Data flow">
+    <div class="cols" id="cols">
+      <svg class="links" id="links" aria-hidden="true"><defs><marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto"><path d="M1 1l6 3-6 3" fill="none" stroke="currentColor" stroke-width="1.25"/></marker></defs><g id="paths"></g></svg>
+    </div>
+  </section>
+  <section class="detail" id="detail" aria-live="polite"></section>
+  <p class="hint" id="note"></p>
+</div>
+
+<script>
+/* ===== Edit only this object. kinds: src | store | ai | rule | web | warn. tag kinds: chg | on | off ===== */
+const FLOW = {
+  title: "Encoder 與 PyTorch",
+  lead: "一句話怎麼變成 injection 分數，訓練時 PyTorch 又怎麼修改模型。點任何一列看細節與對應的程式行。",
+  legend: [["src","輸入資料"],["rule","固定規則，不含權重"],["ai","含可訓練權重"],["store","存檔"],["warn","已知問題"]],
+  columns: [
+    [ {id:"c-text", title:"輸入", badge:"str", nodes:[
+        {id:"x1", kind:"src", icon:"Tx", name:"一句文字", meta:"請幫我把這段會議紀錄…"},
+        {id:"x2", kind:"src", icon:"y", name:"標籤（只有訓練時）", meta:"safe = 0 · injection = 1"} ]},
+      {id:"c-tok", title:"Tokenizer", badge:"WordPiece", sub:"步驟", nodes:[
+        {id:"k1", kind:"rule", icon:"1", name:"切成 token", meta:"20 個 token"},
+        {id:"k2", kind:"rule", icon:"2", name:"加 [CLS] 與 [SEP]", meta:"句首與句尾"},
+        {id:"k3", kind:"rule", icon:"3", name:"token 轉成整數 id", meta:"詞彙表 119,547"},
+        {id:"k4", kind:"rule", icon:"4", name:"補齊長度並做 mask", meta:"最長 256 token"} ]} ],
+    [ {id:"c-enc", title:"Encoder", badge:"DistilBERT", sub:"步驟", nodes:[
+        {id:"e1", kind:"ai", icon:"1", name:"Embedding", meta:"每個 id → 768 維向量"},
+        {id:"e2", kind:"ai", icon:"2", name:"Self-attention", meta:"12 個 head"},
+        {id:"e3", kind:"ai", icon:"3", name:"Feed-forward", meta:"768 → 3072 → 768"},
+        {id:"e4", kind:"rule", icon:"4", name:"取 [CLS] 的向量", meta:"整句的摘要 · 768 維"} ],
+        stats:[["步驟 2–3 重複","6 層"],["向量維度","768"]]},
+      {id:"c-head", title:"分類頭", badge:"新加的層", nodes:[
+        {id:"h1", kind:"ai", icon:"L1", name:"Linear + ReLU", meta:"768 → 768"},
+        {id:"h2", kind:"rule", icon:"Dr", name:"Dropout", meta:"0.2 · 只在訓練時作用"},
+        {id:"h3", kind:"ai", icon:"L2", name:"Linear → logits", meta:"768 → 2 個數字"} ]} ],
+    [ {id:"c-out", title:"推論：算出答案", badge:"guard", sub:"步驟", nodes:[
+        {id:"o1", kind:"rule", icon:"1", name:"softmax", meta:"logits → 機率 0.6827"},
+        {id:"o2", kind:"rule", icon:"2", name:"和 threshold 比較", meta:"0.6827 ≥ 0.5798"},
+        {id:"o3", kind:"warn", icon:"3", name:"輸出 injection", meta:"這句其實是良性", tag:["off","誤報"]} ]},
+      {id:"c-train", title:"訓練：修改權重", badge:"PyTorch loop", sub:"每個 batch 的步驟", nodes:[
+        {id:"t1", kind:"rule", icon:"1", name:"算 loss", meta:"CrossEntropyLoss(logits, y)"},
+        {id:"t2", kind:"rule", icon:"2", name:"清掉舊梯度", meta:"opt.zero_grad()"},
+        {id:"t3", kind:"rule", icon:"3", name:"反向傳播", meta:"loss.backward()"},
+        {id:"t4", kind:"rule", icon:"4", name:"限制梯度大小", meta:"clip_grad_norm_ 1.0"},
+        {id:"t5", kind:"rule", icon:"5", name:"更新權重", meta:"AdamW · opt.step()"},
+        {id:"t6", kind:"rule", icon:"6", name:"調整 learning rate", meta:"sched.step()"} ],
+        stats:[["每個 epoch","30 個 batch"],["epoch 數","4"]]},
+      {id:"c-ckpt", title:"Checkpoint", badge:"artifacts/encoder", nodes:[
+        {id:"s1", kind:"store", icon:"W", name:"model.safetensors", meta:"val F1 最好的那個 epoch"},
+        {id:"s2", kind:"store", icon:"M", name:"heimdall_meta.json", meta:"threshold 0.5798"} ]} ]
+  ],
+  links: [["c-text","c-tok"],["c-tok","c-enc"],["c-enc","c-head"],["c-head","c-out"],["c-head","c-train"],["c-train","c-ckpt"]],
+  details: {
+    x1: {t:"一句文字", lead:"模型的輸入只是一個 Python 字串。模型不能直接處理字串，所以後面每一步都在把它變成數字。", kv:[["範例","<code>請幫我把這段會議紀錄整理成三個重點。</code>"],["進入點","<code>EncoderGuard.classify()</code>，encoder.py:175"]]},
+    x2: {t:"標籤（只有訓練時）", lead:"訓練時每句話附一個正確答案。模型的輸出和它比較，才知道錯多少。推論時沒有標籤。", kv:[["對應表","<code>LABEL2ID = {\"safe\": 0, \"injection\": 1}</code>，encoder.py:20"],["變成 tensor","<code>torch.tensor([...], device=device)</code>，encoder.py:95"],["訓練筆數","465（val 81、test 116）"]]},
+    k1: {t:"步驟 1：切成 token", lead:"Tokenizer 把字串切成詞彙表裡有的小片段。中文在這個模型裡是一個字一個 token。", kv:[["範例結果","<code>[CLS] 請 幫 我 把 這 段 會 議 紀 錄 整 理 成 三 個 重 點 。 [SEP]</code>"],["token 數","20（含 [CLS] 與 [SEP]）"],["程式","<code>tok(texts, ...)</code>，encoder.py:56 與 :93"],["有沒有權重","沒有。它是查表規則，不會被訓練改變。"]]},
+    k2: {t:"步驟 2：加 [CLS] 與 [SEP]", lead:"[CLS] 放在句首，[SEP] 放在句尾。[CLS] 位置的輸出向量之後被當作「整句的摘要」拿去分類。", kv:[["[CLS]","classification 的縮寫。它本身沒有字面意義。"],["為什麼重要","分類頭只看 [CLS] 這一個位置的向量。"]]},
+    k3: {t:"步驟 3：token 轉成整數 id", lead:"每個 token 對應詞彙表裡的一個編號。到這一步，一句話變成一串整數。", kv:[["詞彙表大小","119,547（多語言，所以很大）"],["輸出","<code>input_ids</code>，形狀是 [batch 大小, token 數]"]]},
+    k4: {t:"步驟 4：補齊長度並做 mask", lead:"同一個 batch 裡的句子長度要一樣，短的補上 [PAD]。attention mask 告訴模型哪些位置是補的，不要看。", kv:[["最長","256 token，超過就截斷（<code>MAX_LEN</code>，encoder.py:19）"],["輸出","<code>attention_mask</code>：1 是真的 token，0 是補的"],["搬到 GPU","<code>.to(device)</code>。device 是 <code>mps</code>（Apple GPU）或 <code>cpu</code>，encoder.py:23"]]},
+    e1: {t:"步驟 1：Embedding", lead:"每個整數 id 換成一個 768 維的向量，再加上代表位置的向量。意思相近的 token，向量也相近。這張對照表是訓練出來的。", kv:[["輸入形狀","[batch, token 數]（整數）"],["輸出形狀","[batch, token 數, 768]（小數）"],["位置上限","512 個 token"],["權重來源","預訓練時學到的；微調時也會被更新"]]},
+    e2: {t:"步驟 2：Self-attention", lead:"每個 token 去看同一句裡的其他 token，決定要參考誰多少，然後更新自己的向量。這讓「忽略」和「之前的指示」能互相影響。", kv:[["head 數","12。每個 head 學不同的關注方式。"],["encoder 的意思","每個 token 可以同時看左邊和右邊的字。decoder LLM 只能看左邊。"],["形狀","輸入輸出都是 [batch, token 數, 768]"]]},
+    e3: {t:"步驟 3：Feed-forward", lead:"每個 token 的向量各自通過兩層 Linear：先放大到 3072 維，再縮回 768 維。Attention 負責蒐集資訊，這一步負責加工。", kv:[["結構","Linear 768→3072、啟動函數、Linear 3072→768"],["重複","步驟 2 與 3 合起來是一層，共 6 層疊在一起"]]},
+    e4: {t:"步驟 4：取 [CLS] 的向量", lead:"6 層跑完後，每個 token 都有一個 768 維向量。分類只拿第一個位置（[CLS]）的那一個，其他丟掉。", kv:[["輸入形狀","[batch, token 數, 768]"],["輸出形狀","[batch, 768]"],["這裡的風險","模型若學到「句子是命令語氣」就足以分類，這個向量就只記語氣，不記意圖。"]]},
+    h1: {t:"Linear + ReLU", lead:"分類頭的第一層。Linear 就是「乘上一個權重矩陣再加偏差」。ReLU 把負數變成 0。這一層在預訓練模型裡沒有，是微調時新加、從隨機值開始訓練的。", kv:[["PyTorch 類別","<code>torch.nn.Linear(768, 768)</code>"],["誰加的","<code>AutoModelForSequenceClassification.from_pretrained(..., num_labels=2)</code>，encoder.py:71"]]},
+    h2: {t:"Dropout", lead:"訓練時隨機把 20% 的數值設成 0，逼模型不要依賴少數幾個數字，減少死背訓練資料。推論時不作用。", kv:[["比例","0.2"],["開關","<code>model.train()</code> 開啟（encoder.py:90）；<code>model.eval()</code> 關閉（encoder.py:52）"],["常見錯誤","推論前忘了 <code>model.eval()</code>，同一句話每次分數都不同。"]]},
+    h3: {t:"Linear → logits", lead:"最後一層把 768 維壓成 2 個數字，分別代表 safe 與 injection。這兩個數字叫 logits，還不是機率，可以是任何實數。", kv:[["輸出形狀","[batch, 2]"],["程式","<code>logits = model(**enc).logits</code>，encoder.py:96"],["分岔點","推論時 logits 送去 softmax；訓練時 logits 送去算 loss。"]]},
+    o1: {t:"步驟 1：softmax", lead:"把兩個 logits 轉成加起來等於 1 的兩個機率。取第二個（injection 的機率）當作分數。", kv:[["程式","<code>torch.softmax(logits, dim=-1)[:, 1]</code>，encoder.py:58"],["範例句的分數","0.6827"],["torch.no_grad()","推論時包在這裡面（encoder.py:54）。PyTorch 就不記錄計算過程，比較快也省記憶體。"]]},
+    o2: {t:"步驟 2：和 threshold 比較", lead:"分數大於等於 threshold 就判 injection。Threshold 不是 0.5，而是訓練結束後在 val 上選出 F1 最高的值。", kv:[["threshold","0.5798，存在 <code>heimdall_meta.json</code>"],["程式","<code>\"injection\" if s >= self.threshold else \"safe\"</code>，encoder.py:177"],["限制","val 只有 81 筆，這個 threshold 不穩定。"]]},
+    o3: {t:"步驟 3：輸出 injection（誤報）", lead:"範例句是良性的請求，卻被判成 injection。原因在訓練資料：良性樣本多是問句，攻擊樣本多是命令句，模型學到「命令句就是攻擊」。", kv:[["實際輸出","<code>{\"label\": \"injection\", \"score\": 0.6827}</code>"],["資料來源","deepset/prompt-injections，只有英文與德文"],["怎麼修","M1 加入良性的指令句與 zh-TW 樣本。改模型結構沒有用。"]]},
+    t1: {t:"步驟 1：算 loss", lead:"Loss 是一個數字，代表模型這個 batch 錯得多離譜。CrossEntropyLoss 在正確答案的機率越低時越大。訓練的目標就是讓它變小。", kv:[["程式","<code>loss = loss_fn(logits, y)</code>，encoder.py:97"],["輸入","logits（形狀 [16, 2]）與標籤 y（形狀 [16]）"],["注意","它內部自己做 softmax，所以傳 logits，不要先 softmax。"]]},
+    t2: {t:"步驟 2：清掉舊梯度", lead:"PyTorch 的梯度預設會累加。每個 batch 開始前要先歸零，否則會混到上一個 batch 的梯度。", kv:[["程式","<code>opt.zero_grad()</code>，encoder.py:98"],["常見錯誤","忘了這一行，訓練會發散或學不起來。"]]},
+    t3: {t:"步驟 3：反向傳播", lead:"這是 PyTorch 的核心。前面每一步計算，PyTorch 都偷偷記下來（autograd）。呼叫 backward() 時，它沿著紀錄往回走，算出每個權重「往哪邊調、loss 會變小」。這個方向就是梯度。", kv:[["程式","<code>loss.backward()</code>，encoder.py:99"],["結果存在哪","每個權重的 <code>.grad</code> 屬性"],["範圍","Embedding、6 層 encoder、分類頭的權重全部都有梯度"]]},
+    t4: {t:"步驟 4：限制梯度大小", lead:"偶爾某個 batch 的梯度特別大，一步就把權重改壞。這一步把梯度的總長度壓在 1.0 以內。", kv:[["程式","<code>torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)</code>，encoder.py:100"]]},
+    t5: {t:"步驟 5：更新權重", lead:"Optimizer 依照梯度，把每個權重往讓 loss 變小的方向移動一小步。步伐大小由 learning rate 決定。這一步才真的改了模型。", kv:[["程式","<code>opt.step()</code>，encoder.py:101"],["optimizer","<code>torch.optim.AdamW(model.parameters(), lr=5e-5, weight_decay=0.01)</code>，encoder.py:75"],["weight decay","每一步把權重稍微往 0 拉，減少過度擬合。"]]},
+    t6: {t:"步驟 6：調整 learning rate", lead:"Learning rate 不是固定的。前 10% 的步數從小慢慢加大（warmup），之後線性降到 0。開頭太大步會破壞預訓練好的權重。", kv:[["程式","<code>sched.step()</code>，encoder.py:102；規則在 encoder.py:79"],["總步數","30 個 batch × 4 個 epoch = 120 步，其中 warmup 12 步"],["batch 大小","16（465 筆 ÷ 16，無條件進位 = 30）"]]},
+    s1: {t:"model.safetensors", lead:"每個 epoch 結束後在 val 上算 F1。比之前好就把整個模型的權重存檔。推論時載入的就是這個檔。", kv:[["程式","<code>model.save_pretrained(ARTIFACT_DIR)</code>，encoder.py:113"],["這次存的","第 1 個 epoch（val F1 已到 1.000，之後沒有更高）"],["訓練時間","MPS 上 4 個 epoch 約 65 秒"],["不進 git","<code>artifacts/</code> 在 .gitignore 裡"]]},
+    s2: {t:"heimdall_meta.json", lead:"和模型一起存的紀錄：threshold、模型版本、超參數、訓練裝置。推論時從這裡讀 threshold。", kv:[["threshold","0.5798，在 val 上選 F1 最高的值"],["model_version","<code>heimdall-spike-encoder-e1</code>"],["程式","encoder.py:122–135"]]}
+  },
+  initial: "t3",
+  note: "數字取自 2026-11-14 的實際執行：模型設定讀自 artifacts/encoder/config.json，token 由 tokenizer 實際切出，分數來自 heimdall guard。分類頭的三層是從載入的模型實際印出來的。"
+};
+/* ===== Rendering: no edits needed below ===== */
+const $=id=>document.getElementById(id), esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+document.title=FLOW.title; $("title").textContent=FLOW.title; $("lead").textContent=FLOW.lead; $("note").innerHTML=FLOW.note||"";
+$("legend").innerHTML=FLOW.legend.map(([k,l])=>`<span><i class="dot k-${k}"></i>${esc(l)}</span>`).join("");
+const cols=$("cols"), n=FLOW.columns.length;
+cols.style.gridTemplateColumns=`repeat(${n}, 280px)`; cols.style.minWidth=`${n*280+(n-1)*110}px`;
+const arrow='<div class="arrow" aria-hidden="true"><svg width="30" height="14" viewBox="0 0 30 14"><path d="M1 7h25M21 2l6 5-6 5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></div>';
+cols.insertAdjacentHTML("beforeend", FLOW.columns.map((col,i)=>(i?arrow:"")+`<div class="col">`+col.map(c=>
+  `<div class="card" id="${c.id}"><div class="card-h">${esc(c.title)}${c.badge?` <span class="count">${esc(c.badge)}</span>`:""}</div>`+
+  (c.sub?`<div class="sub">${esc(c.sub)}</div>`:"")+
+  (c.nodes||[]).map(x=>`<button class="node" data-id="${x.id}" aria-pressed="false"><span class="ic k-${x.kind}">${esc(x.icon)}</span><span class="nm"><b>${esc(x.name)}</b>${x.meta?`<small>${esc(x.meta)}</small>`:""}</span>${x.tag?`<span class="tag ${x.tag[0]}">${esc(x.tag[1])}</span>`:""}</button>`).join("")+
+  (c.stats||[]).map(([k,v])=>`<div class="stat"><span>${esc(k)}</span><span>${esc(v)}</span></div>`).join("")+`</div>`).join("")+`</div>`).join(""));
+function show(id){
+  const d=FLOW.details[id]; if(!d) return;
+  document.querySelectorAll(".node").forEach(x=>x.setAttribute("aria-pressed",x.dataset.id===id?"true":"false"));
+  $("detail").innerHTML=`<h2>${d.t}${d.chg?'<span class="tag chg">changing</span>':""}</h2><p class="lead">${d.lead}</p>`+
+    (d.kv?`<dl class="kv">${d.kv.map(([k,v])=>`<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>`:"")+
+    (d.chg?`<div class="change"><b>This change: </b>${d.chg}</div>`:"");
+}
+document.querySelectorAll(".node").forEach(x=>x.addEventListener("click",()=>show(x.dataset.id)));
+show(FLOW.initial||Object.keys(FLOW.details)[0]);
+function drawLinks(){
+  const g=$("paths"); if(getComputedStyle($("links")).display==="none"){g.innerHTML="";return}
+  const o=cols.getBoundingClientRect(), H=26;
+  g.innerHTML=FLOW.links.map(([a,b])=>{
+    const A=$(a).getBoundingClientRect(), B=$(b).getBoundingClientRect();
+    if(Math.abs(A.left-B.left)<4){const x=A.left+A.width/2-o.left; return `<path d="M${x} ${A.bottom-o.top}V${B.top-o.top-2}" marker-end="url(#ah)"/>`}
+    const x1=A.right-o.left,y1=A.top-o.top+H,x2=B.left-o.left-2,y2=B.top-o.top+H,mx=x1+(x2-x1)/2;
+    const r=Math.min(8,Math.abs(y2-y1)/2),dy=y2>y1?r:-r;
+    const d=Math.abs(y2-y1)<1?`M${x1} ${y1}H${x2}`:`M${x1} ${y1}H${mx-r}Q${mx} ${y1} ${mx} ${y1+dy}V${y2-dy}Q${mx} ${y2} ${mx+r} ${y2}H${x2}`;
+    return `<path d="${d}" marker-end="url(#ah)"/>`;
+  }).join("");
+}
+addEventListener("resize",drawLinks);
+(document.fonts?document.fonts.ready:Promise.resolve()).then(drawLinks);
+drawLinks();
+</script>
