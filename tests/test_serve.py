@@ -287,6 +287,16 @@ def test_T19_short_body_times_out_with_408(served):
     assert classify(port, {"text": "good"})[0] == 200  # control
 
 
+def test_T19_silent_connection_is_closed(served):
+    import socket
+
+    port = served(FakeGuard(), read_timeout=0.2)
+    with socket.create_connection(("127.0.0.1", port), timeout=2) as s:
+        t0 = time.perf_counter()
+        assert s.recv(1) == b""  # EOF: the server closed the connection
+        assert time.perf_counter() - t0 < 2
+
+
 def test_T9_missing_checkpoint_exits_1_without_traceback(tmp_path, capsys):
     assert main(["serve", "--encoder-dir", str(tmp_path / "none"), "--port", "0"]) == 1
     err = capsys.readouterr().err
