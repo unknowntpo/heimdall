@@ -50,3 +50,6 @@ artifacts/
 mlflow.db
 mlruns/
 mlartifacts/
+
+# Local IDE project files
+.openidea/

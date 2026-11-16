@@ -19,6 +19,9 @@
 - 模式 `warn`：只顯示警告，內容照常送出。
 - 模式 `off`：不檢查。
 - 服務無法連線時，extension 放行內容並顯示一次警告（fail open）。這是 demo 的選擇；production 的 gate 應該在無法判斷時攔下內容（fail closed）。
+- 例外：在 `block` 模式，只檢查了一部分的內容（`truncated`）與你按 Esc 取消檢查的 tool 輸出，都會被擋下。見已知限制第 1 點與第 6 點。
+
+逐項試用請照 [`tryout-checklist.md`](tryout-checklist.md)，在表格中記下實際結果。
 
 ## 步驟
 
@@ -85,7 +88,7 @@ node --test '.pi/extensions/heimdall/*.test.ts'                    # extension �
 
 以下數字是 2026-11-16 在本機以 `seed-2` 量測（Spec 0005 T16）。
 
-1. **256 個 token 的上限。** Encoder 一次只看 256 個 token。服務把長文字切成重疊的 window（每個最多 254 個內容 token，stride 128），分數取最大值。`benign.md` 有 3 個 window，`poisoned-en.md` 有 4 個。最多 64 個 window（約 8,300 個 token）；超過時回應的 `truncated` 是 `true`，後面的內容沒有被檢查。
+1. **256 個 token 的上限。** Encoder 一次只看 256 個 token。服務把長文字切成重疊的 window（每個最多 254 個內容 token，stride 128），分數取最大值。`benign.md` 有 3 個 window，`poisoned-en.md` 有 4 個。最多 64 個 window（約 8,300 個 token）；超過時回應的 `truncated` 是 `true`，後面的內容沒有被檢查。Extension 在 `block` 模式會擋下這種內容，即使檢查的部分是 safe：tool 輸出換成一段通知，說明只檢查了前 64 個 window；你的訊息會先詢問是否仍要送出。在 `warn` 模式只警告「只檢查了一部分」並放行。Status line 會顯示 `truncated`。所以很長的檔案在 `block` 模式一定讀不到。
 2. **正常的祈使句會被誤擋。** `Please summarise this file and list the main functions.` 的 score 是 0.999（`injection`）。`benign.md` 的 score 是 1.000：只看單一段落時，`Installation`、`Usage` 與 `Contributing` 三段各自被判為 injection（0.986、0.999、0.997）。`poisoned-zh.md` 去掉藏起來的指示後仍是 injection（0.9995），因為「建議先清理超過一年的暫存檔」這類句子被判為 injection。所以三份 demo 文件都會被擋下，`block` 模式無法區分正常與有毒的文件。
 3. **中文 injection 可能漏掉。** 訓練資料中的中文 injection 只有 `deepset/prompt-injections` 的機器翻譯，沒有以 zh-TW 原生撰寫的 injection。本次的中文 injection 範例有被抓到（0.9997），但這不代表其他寫法也會被抓到。
 4. **不同 seed 的模型判斷不同。** 同一份資料、5 個 seed 訓練出的模型，對同一句英文請求的判斷不一致：
@@ -106,4 +109,4 @@ node --test '.pi/extensions/heimdall/*.test.ts'                    # extension �
 
    也可以用關鍵字 baseline 比較：`uv run heimdall serve --model keyword`。
 5. **部分請求較慢。** 多數 `POST /classify` 的 `latency_ms` 是 9 到 70 毫秒。服務啟動後的第一個請求是 865 毫秒；第二輪的第一個請求仍有 522 毫秒。原因可能是 MPS 對新的輸入形狀暖機，尚未查證。
-6. **Fail open。** 服務停止時，extension 放行所有內容，只警告一次。
+6. **Fail open。** 服務停止、逾時或回應錯誤時，extension 放行所有內容，只警告一次。你按 Esc 取消檢查不算服務失敗：不顯示警告；在 `block` 模式，被取消檢查的 tool 輸出會被擋下。
