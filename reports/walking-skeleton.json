@@ -1,0 +1,47 @@
+{
+  "name": "walking-skeleton",
+  "git_commit": "660730e33cea760f094280310a54a01f59e47018",
+  "test_file": "data/test.jsonl",
+  "test_sha256": "29108656ed4db61ad1240187129727f3cd1df36080464358d95457b76353e267",
+  "n_test": 116,
+  "positive_class": "injection",
+  "latency": "single request, wall clock per call incl. tokenisation, after 3 warm-up calls",
+  "models": {
+    "keyword": {
+      "model_version": "heimdall-keyword-0.0.1",
+      "threshold": 0.5,
+      "device": "cpu",
+      "metrics": {
+        "tp": 10,
+        "fp": 0,
+        "fn": 50,
+        "tn": 56,
+        "precision": 1.0,
+        "recall": 0.16666666666666666,
+        "f1": 0.2857142857142857,
+        "fpr": 0.0,
+        "latency_ms_p50": 0.011666910722851753,
+        "latency_ms_p95": 0.07500010542571545
+      }
+    },
+    "encoder": {
+      "model_version": "heimdall-spike-encoder-e1",
+      "base_model": "distilbert/distilbert-base-multilingual-cased",
+      "threshold": 0.5798275470733643,
+      "threshold_source": "val (max F1)",
+      "device": "mps",
+      "metrics": {
+        "tp": 53,
+        "fp": 1,
+        "fn": 7,
+        "tn": 55,
+        "precision": 0.9814814814814815,
+        "recall": 0.8833333333333333,
+        "f1": 0.9298245614035088,
+        "fpr": 0.017857142857142856,
+        "latency_ms_p50": 9.499209001660347,
+        "latency_ms_p95": 16.973708989098668
+      }
+    }
+  }
+}
