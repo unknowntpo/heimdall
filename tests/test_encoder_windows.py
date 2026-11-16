@@ -12,13 +12,16 @@ from heimdall.encoder import META, EncoderGuard, window_starts
 @pytest.fixture(scope="module")
 def tiny_guard(tiny_base_model, tmp_path_factory) -> EncoderGuard:
     import torch
-    from transformers import AutoTokenizer, DistilBertConfig, DistilBertForSequenceClassification
+    from transformers import DistilBertConfig, DistilBertForSequenceClassification, DistilBertTokenizerFast
+
+    from conftest import TINY_VOCAB
 
     d = tmp_path_factory.mktemp("tiny-guard")
     torch.manual_seed(0)
-    cfg = DistilBertConfig.from_pretrained(tiny_base_model, num_labels=2)
+    cfg = DistilBertConfig.from_pretrained(tiny_base_model, num_labels=2, initializer_range=0.5)  # inputs matter
     DistilBertForSequenceClassification(cfg).save_pretrained(d)
-    AutoTokenizer.from_pretrained(tiny_base_model).save_pretrained(d)
+    # vocab= (not vocab_file=): with transformers 5 every letter in the vocab is its own token, not [UNK]
+    DistilBertTokenizerFast(vocab={w: i for i, w in enumerate(TINY_VOCAB)}).save_pretrained(d)
     (d / META).write_text(json.dumps({"threshold": 0.5, "model_version": "tiny"}))
     return EncoderGuard(Path(d), force_cpu=True)
 
@@ -49,11 +52,12 @@ def test_T5_short_text_is_one_window_with_the_same_score(tiny_guard):
 
 def test_T5_long_text_takes_the_max_over_windows(tiny_guard):
     tokens = words(400).split()
-    assert len(tiny_guard.tok(" ".join(tokens), add_special_tokens=False)["input_ids"]) == 400
+    ids = tiny_guard.tok(" ".join(tokens), add_special_tokens=False)["input_ids"]
+    assert len(ids) == 400 and tiny_guard.tok.unk_token_id not in ids
     score, n, truncated = tiny_guard.score_windows(" ".join(tokens))
     assert (n, truncated) == (3, False)
     per_window = [tiny_guard.score(" ".join(tokens[s:s + 254])) for s in (0, 128, 256)]
-    assert len(set(round(p, 6) for p in per_window)) > 1  # control: the max is a real choice
+    assert per_window.index(max(per_window)) != 0  # control: the first window alone would give a lower score
     assert score == pytest.approx(max(per_window), abs=1e-6)
 
 

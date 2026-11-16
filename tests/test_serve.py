@@ -196,3 +196,15 @@ def test_T9_missing_checkpoint_exits_1_without_traceback(tmp_path, capsys):
     assert main(["serve", "--encoder-dir", str(tmp_path / "none"), "--port", "0"]) == 1
     err = capsys.readouterr().err
     assert "no trained encoder" in err and "Traceback" not in err
+
+
+def test_T9_port_in_use_exits_1_without_traceback(capsys):
+    import socket
+
+    with socket.socket() as busy:
+        busy.bind(("127.0.0.1", 0))
+        busy.listen()
+        port = busy.getsockname()[1]
+        assert main(["serve", "--model", "keyword", "--port", str(port)]) == 1
+    err = capsys.readouterr().err
+    assert "cannot listen" in err and str(port) in err and "Traceback" not in err

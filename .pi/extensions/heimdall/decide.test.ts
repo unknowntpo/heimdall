@@ -1,4 +1,4 @@
-// Spec 0005 T10-T15: the pi extension's decisions and wiring. Run: node --test .pi/extensions/heimdall/
+// Spec 0005 T10-T15: the pi extension's decisions and wiring. Run: node --test '.pi/extensions/heimdall/*.test.ts'
 import assert from "node:assert/strict";
 import { existsSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
