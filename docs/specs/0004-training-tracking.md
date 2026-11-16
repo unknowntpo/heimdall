@@ -187,7 +187,7 @@ uv run heimdall sweep --seeds 1 2 3 4 5 --name m1-zh-negatives-seeds
 觀察：
 
 1. Test 上的指標穩定（F1 的 std 為 0.004）。Golden 上的指標不穩定（recall 0.66 到 0.88，`benign-imperative` 誤報 2 到 9）。
-2. Threshold 的範圍是 0.051 到 0.781。Val 幾乎可完全分開，所以使 val F1 最大的 threshold 落在一段很寬的區間內，位置由雜訊決定。Golden 上誤報與 recall 的此消彼長主要來自這個 threshold。
+2. Threshold 的範圍是 0.051 到 0.781，但 threshold 不是 golden 變異的主因。Val 的分數高度兩極化（1406 筆中只有 6 到 9 筆落在 0.05 與 0.95 之間），所以 threshold 在很寬的區間內結果幾乎相同。把 5 個 seed 的 threshold 都固定為 0.5 後，golden recall 仍是 0.66 到 0.88，`benign-imperative` 誤報仍是 2 到 9。變異來自模型本身：不同 seed 的模型在 test（與訓練資料同分布）上表現相同，在 golden（分布不同）上表現不同。
 3. Spec 0003 記錄的單次結果（seed 42，`benign-imperative` 誤報 14/30、golden recall 0.900）落在這 5 個 seed 的範圍之外。單一 seed 的 golden 數字不可用於比較。
 4. Golden 只有 100 筆且尚未經 owner 審查，上表的 golden 數字只用來說明變異，不是模型品質的結論。
 
