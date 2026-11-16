@@ -1,0 +1,224 @@
+<meta charset="utf-8">
+<title>Heimdall 開發週期</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Cloudflare-pipeline style data flow: columns of narrow cards joined by elbow connectors; a detail panel below. Edit only the FLOW object in the script. */
+:root{
+  --bg:#f6f5f2; --surface:#ffffff; --sunk:#efede8; --line:#dcd8cf; --fg:#26252b; --mut:#6c6a72;
+  --fuji:#8a7cc0; --fuji-t:rgba(138,124,192,.12);      /* 藤: AI / model */
+  --seiji:#4f9a82; --seiji-t:rgba(79,154,130,.12);     /* 青磁: rule / deterministic */
+  --wasure:#4f8fbf; --wasure-t:rgba(79,143,191,.12);   /* 勿忘草: external source */
+  --koke:#7d8048; --koke-t:rgba(125,128,72,.14);       /* 苔: storage */
+  --beni:#b0485a; --beni-t:rgba(176,72,90,.10);        /* 薄紅: changing / warning */
+  --display:"Zen Kaku Gothic New","Noto Sans TC","PingFang TC",sans-serif;
+  --body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#18181c; --surface:#212127; --sunk:#1c1c21; --line:#34343c; --fg:#e8e6ee; --mut:#a3a0ab;
+  --fuji:#ada2dc; --fuji-t:rgba(173,162,220,.14); --seiji:#7cc3aa; --seiji-t:rgba(124,195,170,.13);
+  --wasure:#8ebfe4; --wasure-t:rgba(142,191,228,.13); --koke:#b7ba84; --koke-t:rgba(183,186,132,.13);
+  --beni:#e3909e; --beni-t:rgba(227,144,158,.12); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#18181c; --surface:#212127; --sunk:#1c1c21; --line:#34343c; --fg:#e8e6ee; --mut:#a3a0ab;
+  --fuji:#ada2dc; --fuji-t:rgba(173,162,220,.14); --seiji:#7cc3aa; --seiji-t:rgba(124,195,170,.13);
+  --wasure:#8ebfe4; --wasure-t:rgba(142,191,228,.13); --koke:#b7ba84; --koke-t:rgba(183,186,132,.13);
+  --beni:#e3909e; --beni-t:rgba(227,144,158,.12); color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:14px/1.6 var(--body);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 40px}
+.wrap{max-width:1180px;margin:0 auto;display:grid;gap:18px}
+header h1{font:700 1.45rem/1.3 var(--display);margin:0;text-wrap:balance}
+header p{margin:.3rem 0 0;color:var(--mut);max-width:70ch}
+.legend{display:flex;flex-wrap:wrap;gap:8px 14px;margin-top:10px;font-size:.8rem;color:var(--mut)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.dot{width:10px;height:10px;border-radius:3px;border:1px solid currentColor}
+.graph{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:22px;overflow-x:auto}
+.cols{position:relative;display:grid;column-gap:110px;justify-content:center;align-items:start;padding-block:6px}
+.links{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;color:var(--mut)}
+.links path{fill:none;stroke:currentColor;stroke-width:1.25}
+.col{display:grid;gap:40px;position:relative;z-index:1;align-content:start}
+.arrow{display:none;justify-self:center;color:var(--mut)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.card-h{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line);font:700 .95rem var(--display)}
+.count{font:500 .72rem var(--mono);background:var(--sunk);border:1px solid var(--line);border-radius:5px;padding:0 6px;color:var(--mut)}
+.sub{padding:6px 12px 2px;font-size:.74rem;letter-spacing:.06em;color:var(--mut)}
+.node{all:unset;box-sizing:border-box;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:8px;width:100%;padding:8px 12px;cursor:pointer;border-top:1px solid transparent}
+.node+.node{border-top-color:var(--line)}
+.node:hover{background:var(--sunk)}
+.node:focus-visible{outline:2px solid var(--fuji);outline-offset:-2px}
+.node[aria-pressed="true"]{background:var(--fuji-t);box-shadow:inset 3px 0 0 var(--fuji)}
+.ic{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;font:500 .7rem var(--mono);border:1px solid}
+.k-src{color:var(--wasure);background:var(--wasure-t)}
+.k-store{color:var(--koke);background:var(--koke-t)}
+.k-ai{color:var(--fuji);background:var(--fuji-t)}
+.k-rule{color:var(--seiji);background:var(--seiji-t)}
+.k-web{color:var(--mut);background:var(--sunk)}
+.k-warn{color:var(--beni);background:var(--beni-t)}
+.nm{min-width:0}
+.nm b{display:block;font-weight:500;font-size:.88rem}
+.nm small{display:block;color:var(--mut);font:400 .74rem var(--mono);overflow-wrap:anywhere}
+.tag{font-size:.68rem;border-radius:999px;padding:1px 7px;white-space:nowrap;border:1px solid}
+.tag.chg{color:var(--beni);background:var(--beni-t)}
+.tag.on{color:var(--seiji);background:var(--seiji-t)}
+.tag.off{color:var(--mut);background:var(--sunk)}
+.stat{display:flex;justify-content:space-between;gap:8px;padding:6px 12px;font-size:.8rem;border-top:1px solid var(--line)}
+.stat span:last-child{font:500 .78rem var(--mono);font-variant-numeric:tabular-nums}
+.detail{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px;display:grid;gap:12px}
+.detail h2{margin:0;font:700 1.15rem var(--display);display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.detail .lead{margin:0;max-width:72ch}
+.kv{display:grid;grid-template-columns:7.5em 1fr;gap:6px 14px;margin:0}
+.kv dt{color:var(--mut);font-size:.82rem}
+.kv dd{margin:0;min-width:0;overflow-wrap:anywhere}
+.kv code,.lead code{font:400 .8rem var(--mono);background:var(--sunk);border:1px solid var(--line);border-radius:4px;padding:0 4px}
+.change{border:1px solid var(--beni);background:var(--beni-t);border-radius:8px;padding:10px 12px;font-size:.88rem}
+.change b{color:var(--beni)}
+.hint{color:var(--mut);font-size:.8rem}
+@media (max-width:760px){
+  .cols{grid-template-columns:1fr !important;min-width:0 !important;row-gap:14px}
+  .col{gap:14px}
+  .links{display:none}
+  .arrow{display:block;transform:rotate(90deg);padding:2px 0}
+  .graph{padding:14px}
+  .kv{grid-template-columns:1fr}
+  .kv dt{margin-top:4px}
+}
+@media (prefers-reduced-motion:no-preference){.node{transition:background .15s}}
+</style>
+
+<div class="wrap">
+  <header><h1 id="title"></h1><p id="lead"></p><div class="legend" id="legend"></div></header>
+  <section class="graph" aria-label="Data flow">
+    <div class="cols" id="cols">
+      <svg class="links" id="links" aria-hidden="true"><defs><marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto"><path d="M1 1l6 3-6 3" fill="none" stroke="currentColor" stroke-width="1.25"/></marker></defs><g id="paths"></g></svg>
+    </div>
+  </section>
+  <section class="detail" id="detail" aria-live="polite"></section>
+  <p class="hint" id="note"></p>
+</div>
+
+<script>
+/* ===== Edit only this object. kinds: src | store | ai | rule | web | warn. tag kinds: chg | on | off ===== */
+const FLOW = {
+  title: "Heimdall 開發週期",
+  lead: "從原始資料集到上線的 guardrail 模型，再把線上錯誤送回資料：輸入一段文字，輸出 safe 或 injection 加上分數。這是計畫，尚未實作。點任何一列看細節。",
+  legend: [["src","資料來源"],["rule","確定性步驟 / 測試"],["ai","模型"],["web","服務 / 部署"],["warn","未定 / 待驗證"]],
+  columns: [
+    [ {id:"c-src", title:"Sources", badge:"資料來源", nodes:[
+        {id:"pub", kind:"src", icon:"DS", name:"公開資料集", meta:"候選清單", tag:["off","待驗證"]},
+        {id:"gold", kind:"src", icon:"zh", name:"zh-TW golden set", meta:"手寫"},
+        {id:"fb", kind:"src", icon:"FB", name:"Production feedback", meta:"來自 Monitoring", tag:["off","之後"]} ]},
+      {id:"c-pipe", title:"Data pipeline", badge:"pipeline", sub:"步驟", nodes:[
+        {id:"p1", kind:"rule", icon:"1", name:"Licence check", meta:"逐一確認授權"},
+        {id:"p2", kind:"rule", icon:"2", name:"Normalise", meta:"轉成同一個 schema"},
+        {id:"p3", kind:"rule", icon:"3", name:"Dedupe", meta:"去除重複"},
+        {id:"p4", kind:"rule", icon:"4", name:"Train / val / test split", meta:"避免 leakage"} ]} ],
+    [ {id:"c-base", title:"Baselines", badge:"對照組", nodes:[
+        {id:"b1", kind:"rule", icon:"KW", name:"Keyword heuristic", meta:"關鍵字規則"},
+        {id:"b2", kind:"ai", icon:"0S", name:"Zero-shot base model", meta:"未微調"},
+        {id:"b3", kind:"ai", icon:"EN", name:"Encoder 分類器", meta:"PyTorch fine-tune"} ]},
+      {id:"c-train", title:"LoRA training", badge:"PyTorch", nodes:[
+        {id:"t1", kind:"warn", icon:"BM", name:"Base model", meta:"Qwen 0.5B / SmolLM2-360M 級", tag:["off","未定"]},
+        {id:"t2", kind:"ai", icon:"LA", name:"LoRA adapter", meta:"PyTorch + PEFT · Apple M1 Pro"} ],
+        stats:[["記憶體","32 GB"]]},
+      {id:"c-gate", title:"Evaluation gate", badge:"gate", nodes:[
+        {id:"g1", kind:"rule", icon:"Q", name:"品質指標", meta:"precision · recall · F1 · FPR"},
+        {id:"g2", kind:"rule", icon:"ms", name:"Latency", meta:"p50 / p95"},
+        {id:"g3", kind:"warn", icon:"≥", name:"通過門檻", meta:"數值尚未設定", tag:["off","未定"]} ]} ],
+    [ {id:"c-pack", title:"Packaging", badge:"GGUF", sub:"步驟", nodes:[
+        {id:"k1", kind:"rule", icon:"1", name:"Fuse adapter", meta:"adapter 併入 base"},
+        {id:"k2", kind:"rule", icon:"2", name:"Convert to GGUF", meta:"llama.cpp 格式"},
+        {id:"k3", kind:"rule", icon:"3", name:"Quantise", meta:"量化等級未定"},
+        {id:"k4", kind:"rule", icon:"4", name:"Re-evaluate", meta:"量化後重跑評測"} ]},
+      {id:"c-serve", title:"Serving", badge:"llama.cpp", nodes:[
+        {id:"v1", kind:"ai", icon:"LS", name:"llama-server", meta:"載入 GGUF"},
+        {id:"v2", kind:"web", icon:"HT", name:"Thin HTTP API", meta:"POST /v1/guard"},
+        {id:"v3", kind:"rule", icon:"CT", name:"Contract tests", meta:"API 輸入輸出格式"} ]} ],
+    [ {id:"c-ci", title:"CI", badge:"GitHub Actions", nodes:[
+        {id:"ci1", kind:"rule", icon:"UT", name:"Unit tests", meta:"程式碼"},
+        {id:"ci2", kind:"rule", icon:"SC", name:"Data schema tests", meta:"資料格式"},
+        {id:"ci3", kind:"rule", icon:"SE", name:"Smoke eval", meta:"小量評測"} ]},
+      {id:"c-dep", title:"Staging → Prod", badge:"cloud", nodes:[
+        {id:"d0", kind:"warn", icon:"☁", name:"Cloud provider", meta:"尚未選定", tag:["off","未定"]},
+        {id:"d1", kind:"web", icon:"CN", name:"Canary", meta:"先導一小部分流量"},
+        {id:"d2", kind:"web", icon:"RB", name:"Rollback", meta:"退回上一版"} ]},
+      {id:"c-mon", title:"Monitoring", badge:"prod", nodes:[
+        {id:"m1", kind:"web", icon:"LG", name:"Logs", meta:"請求與結果"},
+        {id:"m2", kind:"rule", icon:"DR", name:"Drift", meta:"輸入分布變化"},
+        {id:"m3", kind:"src", icon:"↺", name:"誤判樣本", meta:"回到 Sources"} ]} ]
+  ],
+  links: [["c-src","c-pipe"],["c-pipe","c-base"],["c-pipe","c-train"],["c-train","c-gate"],["c-gate","c-pack"],["c-pack","c-serve"],["c-serve","c-ci"],["c-ci","c-dep"],["c-dep","c-mon"]],
+  details: {
+    pub: {t:"公開資料集", lead:"從公開的 prompt injection / jailbreak 資料集取得訓練資料。清單只是候選，每一份都要先驗證內容與授權。", kv:[["狀態","候選，待驗證"],["授權","待驗證（在 Licence check 逐一確認）"],["數量","未定"]]},
+    gold: {t:"zh-TW golden set", lead:"手寫的繁體中文（台灣用語）樣本，用來檢查模型在中文輸入上的表現。", kv:[["來源","手寫"],["用途","評測"],["數量","未定"]]},
+    fb: {t:"Production feedback", lead:"上線之後，Monitoring 找到的誤判樣本經人工標註，回到資料來源。這一步要等上線後才有。", kv:[["來源","Monitoring 的誤判樣本"],["狀態","之後才做"],["標註流程","未定"]]},
+    p1: {t:"步驟 1：Licence check", lead:"每份資料集進入 pipeline 前，先確認授權允許本專案使用。", kv:[["輸入","Sources 的每份資料集"],["授權結果","待驗證"]]},
+    p2: {t:"步驟 2：Normalise", lead:"把不同來源的格式轉成同一個 schema：一段文字加一個標籤。", kv:[["標籤","<code>safe</code> / <code>injection</code>"],["Schema 細節","未定"]]},
+    p3: {t:"步驟 3：Dedupe", lead:"去除重複或近似重複的樣本，避免同一句話同時出現在 train 和 test。", kv:[["比對方式","未定"]]},
+    p4: {t:"步驟 4：Train / val / test split", lead:"切出 train、val、test 三份，切法要避免 leakage（同源或相似樣本跨切分）。", kv:[["比例","未定"],["用途","train 給訓練、val 調參、test 給 Evaluation gate"]]},
+    b1: {t:"Keyword heuristic", lead:"用關鍵字規則判斷 injection，當作最低對照組。LoRA 模型要贏過它才有意義。", kv:[["類型","確定性規則，無模型"],["關鍵字清單","未定"]]},
+    b3: {t:"Encoder 分類器", lead:"用 PyTorch 微調一個小型 encoder 做二元分類。訓練快，最先產出 precision、recall、F1，也和 LoRA LLM 並排比較。", kv:[["框架","PyTorch，手寫 training loop"],["模型","未定"]]},
+    b2: {t:"Zero-shot base model", lead:"未微調的 base model 直接用 prompt 判斷，用來量出 LoRA 微調帶來的差距。", kv:[["模型","與 LoRA 使用同一個 base model（未定）"]]},
+    t1: {t:"Base model", lead:"小型 decoder LLM，尚未選定。候選是 Qwen 0.5B 級或 SmolLM2-360M 級。", kv:[["狀態","未定"],["候選","Qwen 0.5B 級、SmolLM2-360M 級"],["選擇依據","待驗證（看 Baselines 與評測結果）"]]},
+    t2: {t:"LoRA adapter", lead:"在本機用 PyTorch（MPS）加 Hugging Face PEFT 對 base model 做 LoRA 微調，只訓練 adapter 權重。", kv:[["框架","PyTorch + PEFT；MPS 太慢時改用 MLX-LM（待驗證）"],["硬體","Apple M1 Pro，32 GB 記憶體"],["超參數","未定"]]},
+    g1: {t:"品質指標", lead:"在 test split 與 zh-TW golden set 上量測，並與 Baselines 比較。", kv:[["指標","precision、recall、F1、false-positive rate"],["比較對象","Keyword heuristic、Zero-shot base model"],["結果","尚未量測"]]},
+    g2: {t:"Latency", lead:"量測單次判斷的延遲，看 p50 與 p95。", kv:[["指標","p50、p95"],["結果","尚未量測"]]},
+    g3: {t:"Evaluation gate：通過門檻", lead:"模型要通過這道 gate 才能進入 Packaging。量化後的模型也要再過一次。目前每個指標的門檻數值都還沒設定。", kv:[["門檻","未定"],["輸入","LoRA 模型、Baselines 結果"],["通過後","進入 Packaging"],["量化後","Re-evaluate 再檢查一次"]]},
+    k1: {t:"步驟 1：Fuse adapter", lead:"把 LoRA adapter 併入 base model，得到單一權重。", kv:[["輸入","base model + LoRA adapter"]]},
+    k2: {t:"步驟 2：Convert to GGUF", lead:"把併好的模型轉成 llama.cpp 使用的 GGUF 格式。", kv:[["格式","GGUF"]]},
+    k3: {t:"步驟 3：Quantise", lead:"量化以縮小模型與加快推論。量化等級尚未決定。", kv:[["量化等級","未定"]]},
+    k4: {t:"步驟 4：Re-evaluate", lead:"量化可能降低準確度，所以量化後的 GGUF 要用同一套指標再跑一次 Evaluation gate。", kv:[["指標","同 Evaluation gate"],["門檻","未定"]]},
+    v1: {t:"llama-server", lead:"llama.cpp 的 <code>llama-server</code> 載入量化後的 GGUF 模型並執行推論。", kv:[["執行環境","llama.cpp"],["模型","量化後的 GGUF"]]},
+    v2: {t:"Thin HTTP API", lead:"在 llama-server 前面加一層薄 API：輸入一段文字，回傳標籤與分數。", kv:[["路由","<code>POST /v1/guard</code>"],["輸出","<code>safe</code> 或 <code>injection</code>，加上 score"],["欄位細節","未定"]]},
+    v3: {t:"Contract tests", lead:"檢查 API 的輸入與輸出格式符合約定，避免改動破壞呼叫端。", kv:[["對象","<code>POST /v1/guard</code>"]]},
+    ci1: {t:"Unit tests", lead:"在 GitHub Actions 上跑程式碼的單元測試。", kv:[["平台","GitHub Actions"]]},
+    ci2: {t:"Data schema tests", lead:"檢查資料檔符合 Normalise 定義的 schema。", kv:[["平台","GitHub Actions"],["Schema","未定"]]},
+    ci3: {t:"Smoke eval", lead:"在 CI 上跑一小份評測，確認模型與 API 的基本行為沒有壞掉。", kv:[["平台","GitHub Actions"],["樣本數","未定"]]},
+    d0: {t:"Cloud provider", lead:"staging 與 prod 要部署到雲端，但雲端供應商還沒選。", kv:[["狀態","未定"],["推進順序","local → CI → staging → prod"]]},
+    d1: {t:"Canary", lead:"新版本先接一小部分 prod 流量，觀察沒有問題再全面切換。", kv:[["流量比例","未定"],["環境","staging 驗證後才到 prod"]]},
+    d2: {t:"Rollback", lead:"新版本出問題時，退回上一個已知正常的版本。", kv:[["觸發條件","未定"]]},
+    m1: {t:"Logs", lead:"記錄每次請求的判斷結果，供事後分析。", kv:[["保存位置","未定（依雲端供應商）"]]},
+    m2: {t:"Drift", lead:"觀察線上輸入與判斷結果的分布是否偏離訓練資料。", kv:[["偵測方式","未定"]]},
+    m3: {t:"誤判樣本 → Sources", lead:"這是迴圈的回程：Monitoring 找到的誤判樣本經人工標註後，成為 Sources 的 Production feedback，再走一次 Data pipeline 與訓練。圖上不畫這條回程線，避免線條穿過整張圖。", kv:[["去向","Sources › Production feedback"],["標註流程","未定"],["狀態","上線後才有"]]}
+  },
+  initial: "g3",
+  note: "這是 2026-11-13 的計畫：尚未實作，也沒有任何量測結果。標示「未定」或「待驗證」的項目都還沒決定。"
+};
+/* ===== Rendering: no edits needed below ===== */
+const $=id=>document.getElementById(id), esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+document.title=FLOW.title; $("title").textContent=FLOW.title; $("lead").textContent=FLOW.lead; $("note").innerHTML=FLOW.note||"";
+$("legend").innerHTML=FLOW.legend.map(([k,l])=>`<span><i class="dot k-${k}"></i>${esc(l)}</span>`).join("");
+const cols=$("cols"), n=FLOW.columns.length;
+cols.style.gridTemplateColumns=`repeat(${n}, 280px)`; cols.style.minWidth=`${n*280+(n-1)*110}px`;
+const arrow='<div class="arrow" aria-hidden="true"><svg width="30" height="14" viewBox="0 0 30 14"><path d="M1 7h25M21 2l6 5-6 5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></div>';
+cols.insertAdjacentHTML("beforeend", FLOW.columns.map((col,i)=>(i?arrow:"")+`<div class="col">`+col.map(c=>
+  `<div class="card" id="${c.id}"><div class="card-h">${esc(c.title)}${c.badge?` <span class="count">${esc(c.badge)}</span>`:""}</div>`+
+  (c.sub?`<div class="sub">${esc(c.sub)}</div>`:"")+
+  (c.nodes||[]).map(x=>`<button class="node" data-id="${x.id}" aria-pressed="false"><span class="ic k-${x.kind}">${esc(x.icon)}</span><span class="nm"><b>${esc(x.name)}</b>${x.meta?`<small>${esc(x.meta)}</small>`:""}</span>${x.tag?`<span class="tag ${x.tag[0]}">${esc(x.tag[1])}</span>`:""}</button>`).join("")+
+  (c.stats||[]).map(([k,v])=>`<div class="stat"><span>${esc(k)}</span><span>${esc(v)}</span></div>`).join("")+`</div>`).join("")+`</div>`).join(""));
+function show(id){
+  const d=FLOW.details[id]; if(!d) return;
+  document.querySelectorAll(".node").forEach(x=>x.setAttribute("aria-pressed",x.dataset.id===id?"true":"false"));
+  $("detail").innerHTML=`<h2>${d.t}${d.chg?'<span class="tag chg">changing</span>':""}</h2><p class="lead">${d.lead}</p>`+
+    (d.kv?`<dl class="kv">${d.kv.map(([k,v])=>`<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>`:"")+
+    (d.chg?`<div class="change"><b>This change: </b>${d.chg}</div>`:"");
+}
+document.querySelectorAll(".node").forEach(x=>x.addEventListener("click",()=>show(x.dataset.id)));
+show(FLOW.initial||Object.keys(FLOW.details)[0]);
+function drawLinks(){
+  const g=$("paths"); if(getComputedStyle($("links")).display==="none"){g.innerHTML="";return}
+  const o=cols.getBoundingClientRect(), H=26;
+  g.innerHTML=FLOW.links.map(([a,b])=>{
+    const A=$(a).getBoundingClientRect(), B=$(b).getBoundingClientRect();
+    if(Math.abs(A.left-B.left)<4){const x=A.left+A.width/2-o.left; return `<path d="M${x} ${A.bottom-o.top}V${B.top-o.top-2}" marker-end="url(#ah)"/>`}
+    const x1=A.right-o.left,y1=A.top-o.top+H,x2=B.left-o.left-2,y2=B.top-o.top+H,mx=x1+(x2-x1)/2;
+    const r=Math.min(8,Math.abs(y2-y1)/2),dy=y2>y1?r:-r;
+    const d=Math.abs(y2-y1)<1?`M${x1} ${y1}H${x2}`:`M${x1} ${y1}H${mx-r}Q${mx} ${y1} ${mx} ${y1+dy}V${y2-dy}Q${mx} ${y2} ${mx+r} ${y2}H${x2}`;
+    return `<path d="${d}" marker-end="url(#ah)"/>`;
+  }).join("");
+}
+addEventListener("resize",drawLinks);
+(document.fonts?document.fonts.ready:Promise.resolve()).then(drawLinks);
+drawLinks();
+</script>
