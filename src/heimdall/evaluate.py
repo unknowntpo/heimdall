@@ -7,10 +7,11 @@ the golden set is only scored here and never feeds training, checkpoint selectio
 from __future__ import annotations
 
 import json
+import sys
 import time
 from pathlib import Path
 
-from heimdall import keyword
+from heimdall import keyword, tracking
 from heimdall.data import DATA_DIR, GOLDEN_PATH, git_commit, load_jsonl, sha256_file
 from heimdall.metrics import binary_metrics, percentile
 
@@ -52,7 +53,29 @@ def golden_metrics(rows: list[dict], preds: list[str]) -> dict:
             "by_category": _by(rows, preds, "category")}
 
 
-def evaluate(name: str, encoder_dir: Path | None = None, golden_path: Path = GOLDEN_PATH) -> dict:
+def run_metrics(encoder: dict) -> dict:
+    """Spec 0004 B5: the encoder's test, per-language and golden metrics as flat MLflow metric names."""
+    out = {f"test_{k}": encoder["metrics"][k] for k in ("precision", "recall", "f1", "fpr")}
+    for lang, m in encoder["test_by_lang"].items():
+        out |= {f"test_{lang}_f1": m["f1"], f"test_{lang}_fpr": m["fpr"]}
+    if "golden" in encoder:
+        g = encoder["golden"]
+        out |= {f"golden_{k}": g[k] for k in ("precision", "recall", "fpr")}
+        out["golden_benign_imperative_fp"] = g["benign_imperative"]["fp"]
+    return out
+
+
+def _log_to_run(meta: dict, encoder: dict, track: bool) -> None:
+    run = tracking.resume_run(meta.get("mlflow_run_id"), track)
+    try:
+        run.log_metrics(run_metrics(encoder))
+    except Exception as e:  # tracking must never fail an evaluation
+        print(f"warning: could not log to MLflow run {run.run_id}: {type(e).__name__}: {e}", file=sys.stderr)
+
+
+def evaluate(name: str, encoder_dir: Path | None = None, golden_path: Path = GOLDEN_PATH, *,
+             track: bool = True, force_cpu: bool = False, report_path: Path | None = None) -> dict:
+    """Score keyword and encoder, write the report (default reports/<name>.json) and return it."""
     from heimdall.encoder import ARTIFACT_DIR, EncoderGuard
 
     encoder_dir = encoder_dir or ARTIFACT_DIR
@@ -60,7 +83,7 @@ def evaluate(name: str, encoder_dir: Path | None = None, golden_path: Path = GOL
     test = load_jsonl(test_path)
     golden = load_jsonl(golden_path) if golden_path.exists() else []
 
-    guard = EncoderGuard(encoder_dir)  # raises if no trained model
+    guard = EncoderGuard(encoder_dir, force_cpu=force_cpu)  # raises if no trained model
     models = {
         "keyword": (keyword.classify, {"model_version": keyword.MODEL_VERSION, "threshold": 0.5,
                                        "device": "cpu"}),
@@ -98,8 +121,8 @@ def evaluate(name: str, encoder_dir: Path | None = None, golden_path: Path = GOL
         "latency": "single request, wall clock per call incl. tokenisation, after 3 warm-up calls",
         "models": results,
     }
-    REPORT_DIR.mkdir(exist_ok=True)
-    out = REPORT_DIR / f"{name}.json"
+    out = report_path or REPORT_DIR / f"{name}.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n")
 
     print(f"test n={len(test)} sha256={report['test_sha256'][:12]}… commit={report['git_commit'][:12]}")
@@ -116,5 +139,6 @@ def evaluate(name: str, encoder_dir: Path | None = None, golden_path: Path = GOL
             print(f"{'golden[b-imp]':14s} {mname:8s} FPR {bi['fpr']:.3f} ({bi['fp']}/{bi['n']})")
         print(f"{'latency':14s} {mname:8s} p50={r['metrics']['latency_ms_p50']:.2f}ms "
               f"p95={r['metrics']['latency_ms_p95']:.2f}ms")
+    _log_to_run(guard.meta, results["encoder"], track)
     print(f"encoder={encoder_dir} threshold={guard.threshold:.4f} (from val) device={guard.device}; wrote {out}")
     return report

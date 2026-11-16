@@ -50,9 +50,37 @@ uv run heimdall guard "忽略之前的指示" --model keyword        # 用關鍵
 uv run pytest -q                          # 離線 unit test
 ```
 
+## 多 seed 掃描與 MLflow
+
+單一訓練的數字不穩定，比較兩個 encoder 時以多個 seed 的 mean ± std 為準。見 [docs/specs/0004-training-tracking.md](docs/specs/0004-training-tracking.md)。
+
+```bash
+uv run heimdall train --seed 7 --artifact-dir artifacts/encoder-seed-7   # 單次訓練，指定 seed 與輸出目錄
+uv run heimdall sweep --seeds 1 2 3 4 5 --name my-sweep                  # 每個 seed 訓練並評估一次
+```
+
+`sweep` 把每個 seed 的 checkpoint 與評估報告寫到 `artifacts/sweep/<name>/seed-<N>/`，彙總寫到 `reports/<name>.json`（每個 seed 的指標，加上 mean、sample std、min、max）。中斷後以相同參數重跑，已訓練好的 seed 不會重訓。
+
+訓練與評估預設記錄到本機的 MLflow store `mlflow.db`（不連網路，已 git-ignore）。設定 `MLFLOW_TRACKING_URI` 可改位置；加 `--no-mlflow` 可關閉。開啟 UI：
+
+```bash
+MLFLOW_DISABLE_TELEMETRY=true uv run mlflow ui --backend-store-uri sqlite:///mlflow.db   # 瀏覽 http://127.0.0.1:5000，依 tag `sweep` 篩選
+```
+
+## 在 pi 中試用
+
+`heimdall serve` 在本機啟動 HTTP 服務（`GET /health`、`POST /classify`，只監聽 loopback）。Repo 內的 pi extension `.pi/extensions/heimdall.ts` 在使用者訊息送出前、tool 輸出回到 LLM 前呼叫它。見 [docs/specs/0005-pi-guard.md](docs/specs/0005-pi-guard.md)，逐步操作與已知限制見 [demo/README.md](demo/README.md)。
+
+```bash
+uv run heimdall serve --encoder-dir artifacts/sweep/m1-zh-negatives-seeds/seed-2   # 終端機 1
+pi                                                                                # 終端機 2，在 repo 根目錄；/heimdall 查看模式與服務狀態
+node --test '.pi/extensions/heimdall/*.test.ts'                                   # extension 的測試，不需要 npm 套件
+```
+
 ## 文件
 
 - 路線圖 spec：[docs/specs/0001-lifecycle-roadmap.md](docs/specs/0001-lifecycle-roadmap.md)
 - Walking skeleton spike：[docs/specs/0002-walking-skeleton.md](docs/specs/0002-walking-skeleton.md)
+- pi guard：[docs/specs/0005-pi-guard.md](docs/specs/0005-pi-guard.md)
 - 資料流圖：[docs/dataflow/heimdall-flow.html](docs/dataflow/heimdall-flow.html)
 - 開發流程：[docs/process/workflow.md](docs/process/workflow.md)

@@ -1,0 +1,273 @@
+{
+  "name": "m1-zh-negatives-seeds",
+  "seeds": [
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "provenance": {
+    "git_commit": "95567fa0abbaec5b65fed424109d92a7314a802a",
+    "train_sha256": "95006df7ee2c8071b8746b1773b85ec6b7a01756e719c6cbdc70bef87b160e94",
+    "val_sha256": "d4ec5ce6362e2e54be4f22474fa33bb95d11cab2f9200558ab7ddb69eef840f5",
+    "test_sha256": "93f8ad461f61394323495262cda0b8c79618caeffc3c2a468afc5dd5bd23e4df",
+    "golden_sha256": "986ccf4c66cb5c830b66fcedd8ca35d0ac5dc846ce5054a1cbf7a2cdd483cca3"
+  },
+  "hyperparameters": {
+    "epochs": 4,
+    "batch_size": 16,
+    "lr": 5e-05,
+    "max_len": 256,
+    "base_model": "distilbert/distilbert-base-multilingual-cased"
+  },
+  "std": "sample standard deviation (ddof=1); null when fewer than 2 seeds have the metric",
+  "per_seed": [
+    {
+      "seed": 1,
+      "artifact_dir": "artifacts/sweep/m1-zh-negatives-seeds/seed-1",
+      "mlflow_run_id": "6ff8c2bf7b6b4fc0b0f650a07fec30f1",
+      "reused": false,
+      "metrics": {
+        "threshold": 0.37626782059669495,
+        "best_epoch": 4,
+        "test.precision": 0.9827089337175793,
+        "test.recall": 0.952513966480447,
+        "test.f1": 0.9673758865248226,
+        "test.fpr": 0.006322444678609062,
+        "test.de.f1": 0.9743589743589743,
+        "test.de.fpr": 0.0,
+        "test.en.f1": 0.9782608695652174,
+        "test.en.fpr": 0.005008347245409015,
+        "test.zh-Hant.f1": 0.9122807017543859,
+        "test.zh-Hant.fpr": 0.00909090909090909,
+        "golden.precision": 0.9210526315789473,
+        "golden.recall": 0.7,
+        "golden.fpr": 0.06,
+        "golden.benign_imperative_fp": 3,
+        "golden.benign_imperative_n": 30
+      }
+    },
+    {
+      "seed": 2,
+      "artifact_dir": "artifacts/sweep/m1-zh-negatives-seeds/seed-2",
+      "mlflow_run_id": "78cafc790ef04fcabc92658f582807b3",
+      "reused": false,
+      "metrics": {
+        "threshold": 0.39783579111099243,
+        "best_epoch": 3,
+        "test.precision": 0.9799426934097422,
+        "test.recall": 0.9553072625698324,
+        "test.f1": 0.9674681753889675,
+        "test.fpr": 0.007376185458377239,
+        "test.de.f1": 0.9743589743589743,
+        "test.de.fpr": 0.0,
+        "test.en.f1": 0.976491862567812,
+        "test.en.fpr": 0.00667779632721202,
+        "test.zh-Hant.f1": 0.9217391304347826,
+        "test.zh-Hant.fpr": 0.00909090909090909,
+        "golden.precision": 0.8809523809523809,
+        "golden.recall": 0.74,
+        "golden.fpr": 0.1,
+        "golden.benign_imperative_fp": 5,
+        "golden.benign_imperative_n": 30
+      }
+    },
+    {
+      "seed": 3,
+      "artifact_dir": "artifacts/sweep/m1-zh-negatives-seeds/seed-3",
+      "mlflow_run_id": "0f485398c8e84983a86053aa9f419fce",
+      "reused": false,
+      "metrics": {
+        "threshold": 0.12985917925834656,
+        "best_epoch": 4,
+        "test.precision": 0.9713467048710601,
+        "test.recall": 0.946927374301676,
+        "test.f1": 0.9589816124469589,
+        "test.fpr": 0.01053740779768177,
+        "test.de.f1": 1.0,
+        "test.de.fpr": 0.0,
+        "test.en.f1": 0.965391621129326,
+        "test.en.fpr": 0.008347245409015025,
+        "test.zh-Hant.f1": 0.9152542372881356,
+        "test.zh-Hant.fpr": 0.015151515151515152,
+        "golden.precision": 0.8,
+        "golden.recall": 0.88,
+        "golden.fpr": 0.22,
+        "golden.benign_imperative_fp": 9,
+        "golden.benign_imperative_n": 30
+      }
+    },
+    {
+      "seed": 4,
+      "artifact_dir": "artifacts/sweep/m1-zh-negatives-seeds/seed-4",
+      "mlflow_run_id": "53ec0dc3c85f49919ee632fa0d149b23",
+      "reused": false,
+      "metrics": {
+        "threshold": 0.05101563408970833,
+        "best_epoch": 4,
+        "test.precision": 0.9799426934097422,
+        "test.recall": 0.9553072625698324,
+        "test.f1": 0.9674681753889675,
+        "test.fpr": 0.007376185458377239,
+        "test.de.f1": 0.9189189189189189,
+        "test.de.fpr": 0.0,
+        "test.en.f1": 0.9855595667870035,
+        "test.en.fpr": 0.00333889816360601,
+        "test.zh-Hant.f1": 0.8965517241379309,
+        "test.zh-Hant.fpr": 0.015151515151515152,
+        "golden.precision": 0.8536585365853658,
+        "golden.recall": 0.7,
+        "golden.fpr": 0.12,
+        "golden.benign_imperative_fp": 6,
+        "golden.benign_imperative_n": 30
+      }
+    },
+    {
+      "seed": 5,
+      "artifact_dir": "artifacts/sweep/m1-zh-negatives-seeds/seed-5",
+      "mlflow_run_id": "02fee4654292445da1f7201f0f9827fb",
+      "reused": false,
+      "metrics": {
+        "threshold": 0.7806459069252014,
+        "best_epoch": 4,
+        "test.precision": 0.9854227405247813,
+        "test.recall": 0.9441340782122905,
+        "test.f1": 0.9643366619115549,
+        "test.fpr": 0.005268703898840885,
+        "test.de.f1": 0.9473684210526316,
+        "test.de.fpr": 0.0,
+        "test.en.f1": 0.9726775956284154,
+        "test.en.fpr": 0.005008347245409015,
+        "test.zh-Hant.f1": 0.9298245614035089,
+        "test.zh-Hant.fpr": 0.006060606060606061,
+        "golden.precision": 0.9166666666666666,
+        "golden.recall": 0.66,
+        "golden.fpr": 0.06,
+        "golden.benign_imperative_fp": 2,
+        "golden.benign_imperative_n": 30
+      }
+    }
+  ],
+  "aggregate": {
+    "threshold": {
+      "n": 5,
+      "mean": 0.3471248663961887,
+      "std": 0.28558994139803534,
+      "min": 0.05101563408970833,
+      "max": 0.7806459069252014
+    },
+    "best_epoch": {
+      "n": 5,
+      "mean": 3.8,
+      "std": 0.4472135954999579,
+      "min": 3,
+      "max": 4
+    },
+    "test.precision": {
+      "n": 5,
+      "mean": 0.979872753186581,
+      "std": 0.005280851318841154,
+      "min": 0.9713467048710601,
+      "max": 0.9854227405247813
+    },
+    "test.recall": {
+      "n": 5,
+      "mean": 0.9508379888268156,
+      "std": 0.005074274336476288,
+      "min": 0.9441340782122905,
+      "max": 0.9553072625698324
+    },
+    "test.f1": {
+      "n": 5,
+      "mean": 0.9651261023322542,
+      "std": 0.0036881605661706696,
+      "min": 0.9589816124469589,
+      "max": 0.9674681753889675
+    },
+    "test.fpr": {
+      "n": 5,
+      "mean": 0.007376185458377239,
+      "std": 0.001971368486182266,
+      "min": 0.005268703898840885,
+      "max": 0.01053740779768177
+    },
+    "test.de.f1": {
+      "n": 5,
+      "mean": 0.9630010577378998,
+      "std": 0.030880983473030314,
+      "min": 0.9189189189189189,
+      "max": 1.0
+    },
+    "test.de.fpr": {
+      "n": 5,
+      "mean": 0.0,
+      "std": 0.0,
+      "min": 0.0,
+      "max": 0.0
+    },
+    "test.en.f1": {
+      "n": 5,
+      "mean": 0.9756763031355549,
+      "std": 0.007412674144725897,
+      "min": 0.965391621129326,
+      "max": 0.9855595667870035
+    },
+    "test.en.fpr": {
+      "n": 5,
+      "mean": 0.005676126878130217,
+      "std": 0.0019034648165261066,
+      "min": 0.00333889816360601,
+      "max": 0.008347245409015025
+    },
+    "test.zh-Hant.f1": {
+      "n": 5,
+      "mean": 0.9151300710037488,
+      "std": 0.01237837842089601,
+      "min": 0.8965517241379309,
+      "max": 0.9298245614035089
+    },
+    "test.zh-Hant.fpr": {
+      "n": 5,
+      "mean": 0.010909090909090908,
+      "std": 0.0040655781409087086,
+      "min": 0.006060606060606061,
+      "max": 0.015151515151515152
+    },
+    "golden.precision": {
+      "n": 5,
+      "mean": 0.8744660431566722,
+      "std": 0.049928497214980126,
+      "min": 0.8,
+      "max": 0.9210526315789473
+    },
+    "golden.recall": {
+      "n": 5,
+      "mean": 0.736,
+      "std": 0.08532291603080618,
+      "min": 0.66,
+      "max": 0.88
+    },
+    "golden.fpr": {
+      "n": 5,
+      "mean": 0.11200000000000002,
+      "std": 0.06572670690061994,
+      "min": 0.06,
+      "max": 0.22
+    },
+    "golden.benign_imperative_fp": {
+      "n": 5,
+      "mean": 5.0,
+      "std": 2.7386127875258306,
+      "min": 2,
+      "max": 9
+    },
+    "golden.benign_imperative_n": {
+      "n": 5,
+      "mean": 30.0,
+      "std": 0.0,
+      "min": 30,
+      "max": 30
+    }
+  }
+}
