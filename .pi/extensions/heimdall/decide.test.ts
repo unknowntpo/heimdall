@@ -163,6 +163,10 @@ test("T15 a hanging service times out", async () => {
 	const c = await p;
 	assert.equal(c.ok, false); // ctx.signal cancels too
 	assert.equal((c as any).cancelled, true);
+	const custom = new AbortController(); // the abort reason can be any value, not only an AbortError
+	const q = callService("http://x", "/health", {}, { fetchImpl: hang, timeoutMs: 5000, signal: custom.signal });
+	custom.abort(new Error("esc"));
+	assert.equal(((await q) as any).cancelled, true);
 });
 
 test("T15 malformed verdicts are failures", async () => {
