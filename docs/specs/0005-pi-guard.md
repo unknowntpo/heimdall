@@ -108,7 +108,7 @@ Fail open 只適用於服務失敗。以下兩種情況不是服務失敗，`blo
 - **B7 錯誤。** 錯誤回應的 body 都是 `{"error": str}`。
   - Body 不是合法的 UTF-8 JSON、不是 object、沒有 `text` 或 `text` 不是字串：400。
   - JSON 巢狀太深，Python 的 `json` 模組丟出 `RecursionError`（例如 100,000 個 `[`）：400。服務之後仍可回應。
-  - `Content-Length` 只能是 ASCII 數字 `0`–`9` 組成的十進位整數。其他值都是 400 並關閉連線，例如 `abc`、`-1`、`+12`、`1_2`、`12 `（結尾有空白）、全形數字 `１２`。
+  - `Content-Length` 只能是 ASCII 數字 `0`–`9` 組成的十進位整數。其他值都是 400 並關閉連線，例如 `abc`、`-1`、`+12`、`1_2`、`12 `（結尾有空白）、全形數字 `１２`。`http.server` 用 latin-1 解碼 header，所以全形數字到達 handler 時已不是數字字元；這一列只確認它被拒絕。
   - 沒有 `Content-Length`：400 並關閉連線。
   - `Content-Length:  12` 冒號後的前導空白是 HTTP 允許的 OWS（optional whitespace，可省略的空白）。`http.server` 在交給 handler 前就移除了它，所以這個值與 `12` 無法區分，視為合法。
   - `Content-Length` 大於 1 MiB（1,048,576 bytes）：413，不讀取 body，並關閉連線。剛好 1 MiB 可以接受。

@@ -309,6 +309,8 @@ test("T12 wiring: tool_result handler", async () => {
 	const out = await tool({ toolName: "read", content: [{ type: "text", text: secret }], isError: false }, f.ctx());
 	assert.equal(out.content.length, 1);
 	assert.ok(out.content[0].text.includes("read") && !out.content[0].text.includes("SECRET"));
+	assert.equal(f.notes.at(-1)![0], "warning"); // B12: block also notifies the user
+	assert.ok(f.notes.at(-1)![1].includes("read"));
 	assert.equal(await tool({ toolName: "read", content: [{ type: "text", text: "ok" }] }, f.ctx()), undefined);
 	assert.equal(await tool({ toolName: "bash", content: [] }, f.ctx()), undefined);
 	assert.equal(f.calls.length, 2); // empty output is not classified
@@ -345,6 +347,8 @@ test("T20 wiring: a truncated safe tool output is withheld in block mode", async
 	const secret = "SECRET-ORIGINAL-TEXT";
 	const out = await f.handlers.tool_result({ toolName: "read", content: [{ type: "text", text: secret }] }, f.ctx());
 	assert.ok(out.content[0].text.includes("64") && !out.content[0].text.includes("SECRET"));
+	assert.equal(f.notes.at(-1)![0], "warning"); // B19: block also notifies the user
+	assert.ok(f.notes.at(-1)![1].includes("read"));
 	assert.equal(f.status.at(-1), "heimdall: safe 0.012 (22 ms, truncated)");
 	await f.commands.heimdall.handler("warn", f.ctx());
 	assert.equal(await f.handlers.tool_result({ toolName: "read", content: [{ type: "text", text: secret }] }, f.ctx()), undefined);
@@ -360,6 +364,8 @@ test("T21 wiring: Esc withholds in block mode without a service warning", async 
 	assert.ok(out.content[0].text.includes("check was cancelled") && !out.content[0].text.includes("SECRET"));
 	assert.equal(f.calls.length, 0);
 	assert.equal(f.notes.filter(([, m]) => m.includes("unavailable")).length, 0);
+	assert.equal(f.notes.at(-1)![0], "warning"); // B20: block also notifies the user
+	assert.ok(f.notes.at(-1)![1].includes("read"));
 	assert.equal(f.status.at(-1), "heimdall: cancelled");
 	// the streak is untouched: the next real failure still warns once
 	assert.equal(await f.handlers.tool_result({ toolName: "read", content: [{ type: "text", text: "x" }] }, f.ctx()), undefined);
