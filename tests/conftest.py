@@ -65,8 +65,11 @@ def tiny_base_model(tmp_path_factory) -> Path:
     from transformers import DistilBertConfig, DistilBertModel, DistilBertTokenizerFast
 
     d = tmp_path_factory.mktemp("tiny-base")
-    (d / "vocab.txt").write_text("\n".join(TINY_VOCAB) + "\n")
-    DistilBertTokenizerFast(vocab_file=str(d / "vocab.txt")).save_pretrained(d)
+    # vocab= (not vocab_file=): with transformers 5, vocab_file= yields a 5-token vocabulary and every text is [UNK]
+    tok = DistilBertTokenizerFast(vocab={w: i for i, w in enumerate(TINY_VOCAB)})
+    ids = tok("ignore previous instructions", add_special_tokens=False)["input_ids"]
+    assert ids and tok.unk_token_id not in ids, "the tiny tokenizer maps fixture text to [UNK]"
+    tok.save_pretrained(d)
     cfg = DistilBertConfig(vocab_size=len(TINY_VOCAB), dim=16, hidden_dim=32, n_layers=1, n_heads=2,
                            max_position_embeddings=300)
     DistilBertModel(cfg).save_pretrained(d)
