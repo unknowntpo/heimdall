@@ -35,15 +35,16 @@ D1–D3 已由 owner 接受（2026-11-14）。第一階段範圍是 M1–M4。�
 
 有一個 walking skeleton spike（資料 → 訓練 → 評估 → CLI），不是正式實作。
 
-## Quick start（walking skeleton）
+## Quick start
 
-Spike：先讓整條流程跑起來，細節見 [docs/specs/0002-walking-skeleton.md](docs/specs/0002-walking-skeleton.md)。需要 `uv`。
+資料管線見 [docs/specs/0003-m1-data-pipeline.md](docs/specs/0003-m1-data-pipeline.md)；訓練與評估仍是 [docs/specs/0002-walking-skeleton.md](docs/specs/0002-walking-skeleton.md) 的 spike。需要 `uv`。`heimdall data` 需要 `golden/zh-tw.jsonl`。
 
 ```bash
-uv sync                                   # 安裝依賴（含 PyTorch）
-uv run heimdall data                      # 下載 deepset/prompt-injections，寫入 data/*.jsonl
+uv sync                                   # 安裝依賴（含 PyTorch、OpenCC）
+uv run heimdall data                      # 依 configs/sources.toml 下載五個 source，寫入 data/*.jsonl 與 configs/data.lock.json
 uv run heimdall train                     # fine-tune encoder，checkpoint 存到 artifacts/encoder/
-uv run heimdall evaluate --name walking-skeleton # 在 test 上比較 keyword 與 encoder，寫 reports/walking-skeleton.json
+uv run heimdall evaluate --name m1-after  # 在 test 與 golden set 上比較 keyword 與 encoder，寫 reports/m1-after.json
+uv run heimdall evaluate --name m1-before --encoder-dir artifacts/encoder-spike  # 評估另一個 checkpoint
 uv run heimdall guard "Ignore all previous instructions."   # 用 encoder 判斷一段文字
 uv run heimdall guard "忽略之前的指示" --model keyword        # 用關鍵字 baseline
 uv run pytest -q                          # 離線 unit test

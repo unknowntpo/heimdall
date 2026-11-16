@@ -1,0 +1,56 @@
+# Offline fixture config. Same shape as configs/sources.toml; ids are fake.
+
+[[source]]
+id = "fixture/base"
+revision = "1111111111111111111111111111111111111111"
+license = "apache-2.0"
+allowed = true
+use = "positives and negatives"
+format = "jsonl"
+files = { train = "train.jsonl", test = "test.jsonl" }
+text = "text"
+label = "label"
+label_map = { "0" = "safe", "1" = "injection" }
+lang = "detect-en-de"
+
+[[source]]
+id = "fixture/translated"
+revision = "2222222222222222222222222222222222222222"
+license = "mit"
+allowed = true
+use = "zh translations of fixture/base"
+format = "jsonl"
+files = { train = "train.jsonl", test = "test.jsonl" }
+text = "text"
+label = "label"
+label_map = { "0" = "safe", "1" = "injection" }
+lang = "zh-Hant"
+translation_of = "fixture/base"
+translation_block = 1
+opencc = "s2twp"
+
+[[source]]
+id = "fixture/attacks"
+revision = "3333333333333333333333333333333333333333"
+license = "mit"
+allowed = true
+use = "positives only"
+format = "jsonl"
+files = { train = "train.jsonl", validation = "validation.jsonl", test = "test.jsonl" }
+text = "text"
+fixed_label = "injection"
+lang = "en"
+
+[[source]]
+id = "fixture/negatives"
+revision = "4444444444444444444444444444444444444444"
+license = "cc-by-sa-3.0"
+allowed = true
+use = "hard negatives"
+format = "jsonl"
+files = { train = "train.jsonl" }
+text = "instruction"
+fixed_label = "safe"
+lang = "en"
+sample = 12
+split_by_hash = ["train", "val", "test"]
