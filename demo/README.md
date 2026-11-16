@@ -14,7 +14,7 @@
 
 - `heimdall serve` 在本機啟動 HTTP 服務，只載入一次模型。它只監聽 loopback 位址（只能從本機連線），因為它沒有驗證。
 - `.pi/extensions/heimdall.ts` 是 pi 的 extension。在 repo 根目錄啟動 pi 時，pi 會自動載入它。
-- Extension 檢查兩個地方：你送出的訊息（`input` event），以及 tool 的輸出在回到 LLM 之前（`tool_result` event）。
+- Extension 檢查兩個地方：你送出的訊息（`input` event），以及 tool 的輸出在回到 LLM（large language model，大型語言模型）之前（`tool_result` event）。
 - 模式 `block`（預設）：訊息被判為 injection 時詢問你是否仍要送出；tool 輸出被判為 injection 時，LLM 只會看到一段通知，看不到原文。
 - 模式 `warn`：只顯示警告，內容照常送出。
 - 模式 `off`：不檢查。

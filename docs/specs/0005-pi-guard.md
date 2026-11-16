@@ -9,7 +9,7 @@ Builds on: Spec 0002（`EncoderGuard`、`heimdall guard`）、Spec 0004（`artif
 
 Owner 目前只能用 `heimdall guard "文字"` 一次判斷一段文字。這看不出 Heimdall 放在真正的 coding agent 中是什麼樣子。
 
-pi 是一個 coding agent harness（執行 LLM agent 的終端機程式）。它有 extension 機制，可以在使用者訊息送出前，以及 tool 輸出回到 LLM 前，檢查與改寫內容。
+pi 是一個 coding agent harness（執行 LLM（large language model，大型語言模型）agent 的終端機程式）。它有 extension 機制，可以在使用者訊息送出前，以及 tool 輸出回到 LLM 前，檢查與改寫內容。
 
 可觀察的成果：
 
@@ -49,6 +49,8 @@ curl -s -X POST http://127.0.0.1:8765/classify -d '{"text": "Ignore all previous
 
 | 名詞 | 定義 |
 | --- | --- |
+| UI | User interface。pi 的互動模式有 UI；print mode 與 JSON mode 沒有（`ctx.hasUI` 是 `false`）。 |
+| MPS | Metal Performance Shaders，PyTorch 在 Apple 晶片上的 GPU 後端。 |
 | pi | `@mariozechner/pi-coding-agent`，一個 coding agent harness。本 spec 以 0.70.2 版為準。 |
 | extension | pi 啟動時載入的 TypeScript 模組。它註冊 event handler 與 slash command。 |
 | `input` event | 使用者送出訊息後、LLM 處理前，pi 發出的 event。Handler 可以放行、改寫或攔下訊息。 |
@@ -101,7 +103,8 @@ curl -s -X POST http://127.0.0.1:8765/classify -d '{"text": "Ignore all previous
   - Body 不是合法的 UTF-8 JSON、不是 object、沒有 `text` 或 `text` 不是字串：400。
   - `Content-Length` 不是非負整數：400。沒有 `Content-Length` 時視為空 body，所以是 400。
   - `Content-Length` 大於 1 MiB（1,048,576 bytes）：413，不讀取 body，並關閉連線。剛好 1 MiB 可以接受。
-  - 其他路徑或方法（例如 `GET /classify`、`POST /health`）：404。
+  - 未知的路徑，以及 `GET /classify` 與 `POST /health`：404。其他 HTTP 方法（例如 `PUT`）由 `http.server` 回 501，不在本 spec 的合約內。
+  - 413 的測試只送 header。真正送出超過 1 MiB body 的 client，可能在收到 413 之前看到連線被重設。
 - **B8 一次一個推論。** 服務只有一個模型。多個請求可以同時連線（`ThreadingHTTPServer`），但模型推論以一個 lock 依序執行。
 - **B9 缺少 checkpoint。** `--model encoder` 且 DIR 沒有 `heimdall_meta.json` 時，印出與 `EncoderGuard` 相同的錯誤訊息（`error: no trained encoder at DIR/ …`）到 stderr，以狀態 1 結束，不印 traceback。無法監聽 HOST:PORT（例如 port 已被其他程式使用）時，印出 `error: cannot listen on HOST:PORT: …`，同樣以狀態 1 結束，不印 traceback。
 
@@ -196,7 +199,7 @@ Python 測試不載入真實模型。服務測試在 port 0（作業系統指定
 
 ## Non-goals
 
-- Production gate：fail closed、驗證、TLS、rate limit、多個 worker。
+- Production gate：fail closed、驗證、TLS（Transport Layer Security，加密連線）、rate limit、多個 worker。
 - 監聽非 loopback 位址或在容器中部署（M6 以後）。
 - 改善模型。本 spec 只展示目前的模型，誤報與漏報記錄在 `demo/README.md` 的已知限制。
 - 檢查 tool 呼叫的參數（`tool_call` event）或 LLM 的回覆。
