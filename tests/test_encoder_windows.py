@@ -61,6 +61,11 @@ def test_T5_long_text_takes_the_max_over_windows(tiny_guard):
     assert score == pytest.approx(max(per_window), abs=1e-6)
 
 
+def test_T5_window_content_is_254_tokens(tiny_guard):
+    assert tiny_guard.score_windows(words(254))[1:] == (1, False)
+    assert tiny_guard.score_windows(words(255))[1:] == (2, False)
+
+
 def test_T5_window_cap_reports_truncated(tiny_guard):
     text = words(400)
     assert tiny_guard.score_windows(text, max_windows=2)[1:] == (2, True)
