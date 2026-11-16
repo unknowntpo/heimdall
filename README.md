@@ -67,9 +67,20 @@ uv run heimdall sweep --seeds 1 2 3 4 5 --name my-sweep                  # 每�
 MLFLOW_DISABLE_TELEMETRY=true uv run mlflow ui --backend-store-uri sqlite:///mlflow.db   # 瀏覽 http://127.0.0.1:5000，依 tag `sweep` 篩選
 ```
 
+## 在 pi 中試用
+
+`heimdall serve` 在本機啟動 HTTP 服務（`GET /health`、`POST /classify`，只監聽 loopback）。Repo 內的 pi extension `.pi/extensions/heimdall.ts` 在使用者訊息送出前、tool 輸出回到 LLM 前呼叫它。見 [docs/specs/0005-pi-guard.md](docs/specs/0005-pi-guard.md)，逐步操作與已知限制見 [demo/README.md](demo/README.md)。
+
+```bash
+uv run heimdall serve --encoder-dir artifacts/sweep/m1-zh-negatives-seeds/seed-2   # 終端機 1
+pi                                                                                # 終端機 2，在 repo 根目錄；/heimdall 查看模式與服務狀態
+node --test '.pi/extensions/heimdall/*.test.ts'                                   # extension 的測試，不需要 npm 套件
+```
+
 ## 文件
 
 - 路線圖 spec：[docs/specs/0001-lifecycle-roadmap.md](docs/specs/0001-lifecycle-roadmap.md)
 - Walking skeleton spike：[docs/specs/0002-walking-skeleton.md](docs/specs/0002-walking-skeleton.md)
+- pi guard：[docs/specs/0005-pi-guard.md](docs/specs/0005-pi-guard.md)
 - 資料流圖：[docs/dataflow/heimdall-flow.html](docs/dataflow/heimdall-flow.html)
 - 開發流程：[docs/process/workflow.md](docs/process/workflow.md)

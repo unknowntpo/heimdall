@@ -19,6 +19,8 @@ BASE_MODEL = "distilbert/distilbert-base-multilingual-cased"
 ARTIFACT_DIR = Path("artifacts/encoder")
 SEED = 42
 MAX_LEN = 256
+WINDOW_STRIDE = 128  # Spec 0005 B5
+MAX_WINDOWS = 64
 LOG_EVERY = 10
 META = "heimdall_meta.json"
 WEIGHTS = "model.safetensors"
@@ -63,6 +65,14 @@ def score_texts(model, tok, texts: list[str], device, batch_size: int = 32) -> l
             probs = torch.softmax(model(**enc).logits.float(), dim=-1)[:, 1]
             out += probs.cpu().tolist()
     return out
+
+
+def window_starts(n_tokens: int, width: int, stride: int, max_windows: int) -> tuple[list[int], bool]:
+    """Spec 0005 B5: window start offsets until one reaches the end; (first max_windows, whether cut)."""
+    starts = [0]
+    while starts[-1] + width < n_tokens:
+        starts.append(starts[-1] + stride)
+    return starts[:max_windows], len(starts) > max_windows
 
 
 def training_provenance(data_dir: Path = DATA_DIR) -> dict:
@@ -219,9 +229,26 @@ class EncoderGuard:
         self.model = AutoModelForSequenceClassification.from_pretrained(path).to(self.device)
         self.model.eval()
         self.threshold = float(self.meta["threshold"])
+        self.model_version = self.meta["model_version"]
 
     def score(self, text: str) -> float:
         return score_texts(self.model, self.tok, [text], self.device, batch_size=1)[0]
+
+    def score_windows(self, text: str, max_windows: int = MAX_WINDOWS, batch_size: int = 16):
+        """Spec 0005 B5: max P(injection) over overlapping windows; returns (score, n_windows, truncated)."""
+        import torch
+
+        ids = self.tok(text, add_special_tokens=False, verbose=False)["input_ids"]
+        width = MAX_LEN - 2  # BERT-style single sequence: [CLS] tokens [SEP]
+        cls, sep = self.tok.cls_token_id, self.tok.sep_token_id
+        starts, truncated = window_starts(len(ids), width, WINDOW_STRIDE, max_windows)
+        windows = [[cls, *ids[s : s + width], sep] for s in starts]
+        scores: list[float] = []
+        with torch.no_grad():
+            for i in range(0, len(windows), batch_size):
+                enc = self.tok.pad({"input_ids": windows[i : i + batch_size]}, return_tensors="pt").to(self.device)
+                scores += torch.softmax(self.model(**enc).logits.float(), dim=-1)[:, 1].cpu().tolist()
+        return max(scores), len(windows), truncated
 
     def classify(self, text: str) -> dict:
         s = self.score(text)

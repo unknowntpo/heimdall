@@ -1,4 +1,4 @@
-"""`heimdall` command line: data, train, evaluate, sweep, guard."""
+"""`heimdall` command line: data, train, evaluate, sweep, guard, serve."""
 
 from __future__ import annotations
 
@@ -39,6 +39,12 @@ def main(argv: list[str] | None = None) -> int:
     g = sub.add_parser("guard", help="classify one text")
     g.add_argument("text")
     g.add_argument("--model", choices=["encoder", "keyword"], default="encoder")
+    v = sub.add_parser("serve", help="local HTTP service: GET /health, POST /classify (loopback only)")
+    v.add_argument("--host", default="127.0.0.1", help="loopback address only; the service has no auth")
+    v.add_argument("--port", type=int, default=8765)
+    v.add_argument("--encoder-dir", type=Path, default=Path("artifacts/encoder"))
+    v.add_argument("--model", choices=["encoder", "keyword"], default="encoder")
+    v.add_argument("--cpu", action="store_true", help="force CPU")
     args = p.parse_args(argv)
 
     if args.cmd == "data":
@@ -80,6 +86,10 @@ def main(argv: list[str] | None = None) -> int:
                 return 2
             out = guard.classify(args.text)
         print(json.dumps(out, ensure_ascii=False))
+    elif args.cmd == "serve":
+        import heimdall.serve as serve
+        return serve.run(host=args.host, port=args.port, encoder_dir=args.encoder_dir, model=args.model,
+                         force_cpu=args.cpu)
     return 0
 
 
