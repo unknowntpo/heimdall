@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import ipaddress
 import json
+import re
 import socket
 import sys
 import threading
@@ -18,6 +19,8 @@ from pathlib import Path
 from heimdall import keyword
 
 MAX_BODY = 1024 * 1024  # 1 MiB
+READ_TIMEOUT = 10.0  # B18: seconds a connection may stall while the server reads from it
+_DIGITS = re.compile(r"[0-9]+")  # B7: int() would also accept "+12", "1_2", "12 " and non-ASCII digits
 
 
 class KeywordGuard:
@@ -65,11 +68,12 @@ def classify(guard, lock: threading.Lock, text: str) -> dict:
             "latency_ms": round(latency_ms, 2), "n_windows": n_windows, "truncated": truncated}
 
 
-def make_handler(guard):
+def make_handler(guard, read_timeout: float = READ_TIMEOUT):
     lock = threading.Lock()  # B8: one model, one inference at a time
 
     class Handler(BaseHTTPRequestHandler):
         server_version = "heimdall"
+        timeout = read_timeout  # B18: socket timeout; also closes idle keep-alive connections
 
         def _send(self, status: int, body: dict) -> None:
             raw = json.dumps(body, ensure_ascii=False).encode()
@@ -89,33 +93,43 @@ def make_handler(guard):
             if self.path != "/classify":
                 self.close_connection = True  # the body is not read
                 return self._send(404, {"error": f"not found: POST {self.path}"})
-            try:
-                length = int(self.headers.get("Content-Length", "0"))
-                if length < 0:
-                    raise ValueError
-            except ValueError:
+            raw_length = self.headers.get("Content-Length")
+            if raw_length is None or not _DIGITS.fullmatch(raw_length):
                 self.close_connection = True
-                return self._send(400, {"error": "Content-Length must be a non-negative integer"})
+                return self._send(400, {"error": "Content-Length must be a non-negative decimal integer"})
+            length = int(raw_length)
             if length > MAX_BODY:
                 self.close_connection = True
                 return self._send(413, {"error": f"body is larger than {MAX_BODY} bytes"})
             try:
-                body = json.loads(self.rfile.read(length).decode("utf-8"))
-            except ValueError:  # includes UnicodeDecodeError and JSONDecodeError
+                raw = self.rfile.read(length)
+            except TimeoutError:  # B18: the client sent fewer bytes than Content-Length
+                self.close_connection = True
+                return self._send(408, {"error": f"body not received within {self.timeout:g} s"})
+            try:
+                body = json.loads(raw.decode("utf-8"))
+            except (ValueError, RecursionError):  # ValueError includes UnicodeDecodeError and JSONDecodeError
                 return self._send(400, {"error": "body must be UTF-8 JSON"})
             if not isinstance(body, dict) or not isinstance(body.get("text"), str):
                 return self._send(400, {"error": 'body must be a JSON object with a string "text"'})
-            self._send(200, classify(guard, lock, body["text"]))
+            try:
+                verdict = classify(guard, lock, body["text"])
+            except Exception as err:  # B17: one line on stderr, no traceback in the response
+                print(f"heimdall serve: internal error on POST /classify: {type(err).__name__}: {err}",
+                      file=sys.stderr, flush=True)
+                return self._send(500, {"error": f"internal error: {type(err).__name__}"})
+            self._send(200, verdict)
 
     return Handler
 
 
-def make_server(guard, host: str = "127.0.0.1", port: int = 8765) -> ThreadingHTTPServer:
+def make_server(guard, host: str = "127.0.0.1", port: int = 8765,
+                read_timeout: float = READ_TIMEOUT) -> ThreadingHTTPServer:
     check_host(host)
     cls = ThreadingHTTPServer
     if ":" in host:
         cls = type("ThreadingHTTPServerV6", (ThreadingHTTPServer,), {"address_family": socket.AF_INET6})
-    return cls((host, port), make_handler(guard))
+    return cls((host, port), make_handler(guard, read_timeout))
 
 
 def run(host: str, port: int, encoder_dir: Path, model: str, force_cpu: bool) -> int:

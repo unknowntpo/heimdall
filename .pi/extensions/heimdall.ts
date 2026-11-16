@@ -1,8 +1,9 @@
 /**
- * Heimdall guard for pi (Spec 0005 B10-B15).
+ * Heimdall guard for pi (Spec 0005 B10-B15, B19, B20).
  *
  * Sends each user message (`input`) and each tool output (`tool_result`) to a local `heimdall serve`
  * and blocks or warns on prompt injection. Fails open when the service is unavailable (demo harness).
+ * In block mode it also withholds text that was only partly checked (truncated) or whose check was cancelled (Esc).
  *
  * 1. uv run heimdall serve
  * 2. pi            (in this repo; project-local extensions are discovered from .pi/extensions/)
