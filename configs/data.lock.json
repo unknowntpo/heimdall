@@ -30,12 +30,32 @@
       "license": "mit",
       "raw_rows": 7282,
       "rows_after_normalise": 662
+    },
+    "databricks/databricks-dolly-15k#zh-Hant": {
+      "derived_from": "databricks/databricks-dolly-15k",
+      "revision": "bdd27f4d94b9c1f951818a7da7fd7aeea5dbff1a",
+      "license": "cc-by-sa-3.0 (translation of databricks/databricks-dolly-15k; see sources/dolly-zh-hant.NOTICE)",
+      "raw_rows": 2000,
+      "rows_after_normalise": 1941,
+      "translation": {
+        "file": "sources/dolly-zh-hant.jsonl",
+        "sha256": "c99b57e99950e421b02f8490c03b8cf499a55a39b78339f1d7286e1754c59948",
+        "file_rows": 1947,
+        "selected": 2000,
+        "excluded": 2,
+        "dropped": {
+          "empty": 0,
+          "identical": 0,
+          "no_cjk": 0,
+          "english_overlap": 57
+        }
+      }
     }
   },
   "dropped_sources": [],
   "golden_rows_sha256": "e2deb3bad49f4032065aba9628d3dae1971ad2fc847596d2d1fe4a2431a54baf",
   "removed": {
-    "input_rows": 6630,
+    "input_rows": 8571,
     "exact_removed": 87,
     "exact_contradiction_groups": 0,
     "exact_contradiction_rows": 0,
@@ -53,38 +73,39 @@
   },
   "splits": {
     "train": {
-      "rows": 4263,
+      "rows": 5626,
       "labels": {
-        "safe": 3028,
+        "safe": 4391,
         "injection": 1235
       },
-      "sha256": "2dfea6c10f1de4aacd288b0cec8d4276c1857834c0482ee10753ab4d76befe5b"
+      "sha256": "95006df7ee2c8071b8746b1773b85ec6b7a01756e719c6cbdc70bef87b160e94"
     },
     "val": {
-      "rows": 1104,
+      "rows": 1406,
       "labels": {
-        "safe": 661,
+        "safe": 963,
         "injection": 443
       },
-      "sha256": "bdb70f20fce71ea355eb9abf291db565c78a6b961ad2da0ffde3b84f33b00b69"
+      "sha256": "d4ec5ce6362e2e54be4f22474fa33bb95d11cab2f9200558ab7ddb69eef840f5"
     },
     "test": {
-      "rows": 1031,
+      "rows": 1307,
       "labels": {
-        "safe": 673,
+        "safe": 949,
         "injection": 358
       },
-      "sha256": "3dcf4b812e5f205f991f91cfa61e74a1ac55e15c5f845800f982e0c6bb0849f7"
+      "sha256": "93f8ad461f61394323495262cda0b8c79618caeffc3c2a468afc5dd5bd23e4df"
     }
   },
   "stats": {
     "train": {
       "by_label": {
         "injection": 1235,
-        "safe": 3028
+        "safe": 4391
       },
       "by_source": {
         "Lakera/gandalf_ignore_instructions|injection": 614,
+        "databricks/databricks-dolly-15k#zh-Hant|safe": 1363,
         "databricks/databricks-dolly-15k|safe": 2071,
         "deepset/prompt-injections|injection": 149,
         "deepset/prompt-injections|safe": 278,
@@ -99,20 +120,21 @@
         "en|injection": 1052,
         "en|safe": 2663,
         "zh-Hant|injection": 137,
-        "zh-Hant|safe": 257
+        "zh-Hant|safe": 1620
       },
       "median_chars": {
-        "safe": 56.0,
+        "safe": 42,
         "injection": 92
       }
     },
     "val": {
       "by_label": {
         "injection": 443,
-        "safe": 661
+        "safe": 963
       },
       "by_source": {
         "Lakera/gandalf_ignore_instructions|injection": 272,
+        "databricks/databricks-dolly-15k#zh-Hant|safe": 302,
         "databricks/databricks-dolly-15k|safe": 445,
         "deepset/prompt-injections|injection": 46,
         "deepset/prompt-injections|safe": 64,
@@ -127,20 +149,21 @@
         "en|injection": 386,
         "en|safe": 577,
         "zh-Hant|injection": 43,
-        "zh-Hant|safe": 59
+        "zh-Hant|safe": 361
       },
       "median_chars": {
-        "safe": 58,
+        "safe": 44,
         "injection": 77
       }
     },
     "test": {
       "by_label": {
         "injection": 358,
-        "safe": 673
+        "safe": 949
       },
       "by_source": {
         "Lakera/gandalf_ignore_instructions|injection": 112,
+        "databricks/databricks-dolly-15k#zh-Hant|safe": 276,
         "databricks/databricks-dolly-15k|safe": 440,
         "deepset/prompt-injections|injection": 59,
         "deepset/prompt-injections|safe": 56,
@@ -155,10 +178,10 @@
         "en|injection": 279,
         "en|safe": 599,
         "zh-Hant|injection": 59,
-        "zh-Hant|safe": 54
+        "zh-Hant|safe": 330
       },
       "median_chars": {
-        "safe": 63,
+        "safe": 45,
         "injection": 131.0
       }
     }

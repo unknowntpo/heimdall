@@ -46,6 +46,18 @@ _ENGLISH = set("the and is are you to of a an in what how please for with this t
                "do does why which or be".split())
 
 
+def git_commit() -> str:
+    """HEAD sha, with "-dirty" when tracked files differ from it; "unknown" outside a git checkout."""
+    import subprocess
+
+    try:
+        sha = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+        dirty = subprocess.check_output(["git", "status", "--porcelain", "--untracked-files=no"], text=True).strip()
+        return sha + ("-dirty" if dirty else "")
+    except (OSError, subprocess.CalledProcessError):
+        return "unknown"
+
+
 class PipelineError(Exception):
     """The pipeline must stop with a non-zero exit and write no split files."""
 
@@ -88,20 +100,32 @@ def load_config(path: Path) -> list[dict]:
     sources = tomllib.loads(Path(path).read_text(encoding="utf-8")).get("source", [])
     if not sources:
         raise PipelineError(f"{path}: no [[source]] entries")
-    seen = []
+    seen = {}
     for s in sources:
         sid = s.get("id") or "<missing id>"
         if not isinstance(s.get("license"), str) or not s["license"].strip():
             raise PipelineError(f"{sid}: licence not recorded in {path}")
         if s.get("allowed") is not True:
             raise PipelineError(f"{sid}: allowed is not true in {path}")
-        if not re.fullmatch(r"[0-9a-f]{40}", str(s.get("revision", ""))):
-            raise PipelineError(f"{sid}: revision must be a 40-hex commit sha")
-        files = s.get("files") or {}
-        if not files or set(files) - set(UPSTREAM_SPLITS):
-            raise PipelineError(f"{sid}: files must map {UPSTREAM_SPLITS} splits to paths")
-        if s.get("format") not in ("parquet", "csv", "jsonl") or not s.get("text") or not s.get("lang"):
-            raise PipelineError(f"{sid}: format, text and lang are required")
+        if s.get("derived_from"):  # B12: committed translation of an earlier source; nothing is downloaded
+            base = seen.get(s["derived_from"])
+            if base is None or base.get("derived_from") or not base.get("sample"):
+                raise PipelineError(f"{sid}: derived_from must name an earlier, sampled, downloaded source")
+            if not (s.get("translation_file") and s.get("fixed_label") and s.get("lang")
+                    and isinstance(s.get("sample"), int) and s["sample"] > 0):
+                raise PipelineError(f"{sid}: translation_file, fixed_label, lang and sample are required")
+            if not re.fullmatch(r"[0-9a-f]{64}", str(s.get("translation_sha256", ""))):
+                raise PipelineError(f"{sid}: translation_sha256 must pin the translation file (64 hex)")
+            if not all(isinstance(v, str) and v.strip() for v in (s.get("translation_exclude") or {}).values()):
+                raise PipelineError(f"{sid}: every translation_exclude entry needs a reason")
+        else:
+            if not re.fullmatch(r"[0-9a-f]{40}", str(s.get("revision", ""))):
+                raise PipelineError(f"{sid}: revision must be a 40-hex commit sha")
+            files = s.get("files") or {}
+            if not files or set(files) - set(UPSTREAM_SPLITS):
+                raise PipelineError(f"{sid}: files must map {UPSTREAM_SPLITS} splits to paths")
+            if s.get("format") not in ("parquet", "csv", "jsonl") or not s.get("text") or not s.get("lang"):
+                raise PipelineError(f"{sid}: format, text and lang are required")
         if bool(s.get("fixed_label")) == bool(s.get("label_map")):
             raise PipelineError(f"{sid}: set exactly one of fixed_label or label + label_map")
         if s.get("split_by_hash", ["train", "val"]) not in (["train", "val"], ["train", "val", "test"]):
@@ -110,7 +134,7 @@ def load_config(path: Path) -> list[dict]:
             raise PipelineError(f"{sid}: translation_of must name an earlier source")
         if sid in seen:
             raise PipelineError(f"{sid}: listed twice")
-        seen.append(sid)
+        seen[sid] = s
     return sources
 
 
@@ -161,6 +185,13 @@ def normalise_source(src: dict, raw: dict[str, list[dict]], raws: dict[str, dict
     """Map one source's raw rows to schema rows. Rows with empty text are rejected (B2)."""
     if src.get("translation_of"):
         return _translation_rows(src, raw, raws[src["translation_of"]])
+    rows = _source_rows(src, raw)
+    if src.get("sample"):  # deterministic sample: smallest ids
+        rows = sorted(rows, key=lambda r: r["id"])[: src["sample"]]
+    return rows
+
+
+def _source_rows(src: dict, raw: dict[str, list[dict]]) -> list[dict]:
     rows = []
     for split, items in raw.items():
         for r in items:
@@ -168,8 +199,6 @@ def normalise_source(src: dict, raw: dict[str, list[dict]], raws: dict[str, dict
                 rows.append(make_row(r[src["text"]], _label(src, r), src["id"], split, _lang(src, r[src["text"]] or "")))
             except ValueError:
                 continue
-    if src.get("sample"):  # deterministic sample: smallest ids
-        rows = sorted(rows, key=lambda r: r["id"])[: src["sample"]]
     return rows
 
 
@@ -203,6 +232,96 @@ def _translation_rows(src: dict, raw: dict, orig: dict) -> list[dict]:
             except ValueError:
                 continue
     return rows
+
+
+# ---------- translated negatives (B12, B13, B14) ----------
+
+TRANSLATION_DROP_REASONS = ("empty", "identical", "no_cjk", "english_overlap")
+_CJK = re.compile("[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]")
+
+
+def source_sha256(text: str) -> str:
+    """Join key of a translation row: sha256 of the exact English text (not normalised, no prefix)."""
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def derived_source_texts(src: dict, base: dict, raw: dict[str, list[dict]]) -> list[str]:
+    """B12: the base rows its own sample did not use. Sort by the B2 id (sha256 of the normalised text),
+    skip the ids of the first base["sample"] rows, take the next src["sample"]."""
+    rows = sorted(_source_rows(base, raw), key=lambda r: r["id"])
+    used = {r["id"] for r in rows[: base["sample"]]}
+    return [r["text"] for r in rows[base["sample"]:] if r["id"] not in used][: src["sample"]]
+
+
+def english_overlap(texts: list[str], others: list[str]) -> set[int]:
+    """B14: indices of `texts` (in id order) whose English is an exact or near-duplicate of any of
+    `others`, or of an earlier text, within one near-duplicate group. The first text of a group with no
+    `others` is kept."""
+    n = len(others)
+    norms = [normalise(t) for t in others] + [normalise(t) for t in texts]
+    drop: set[int] = set()
+    for comp in _components(len(norms), near_duplicate_pairs(norms)):
+        sel = sorted(i - n for i in comp if i >= n)
+        drop.update(sel if any(i < n for i in comp) else sel[1:])
+    return drop
+
+
+def load_translation(src: dict, texts: list[str]) -> tuple[list[str | None], dict]:
+    """B13: join the committed translation file to `texts` by source_sha256. Fails closed when the file
+    differs from translation_sha256, a row is malformed or duplicated, a row matches no selected text,
+    or a selected text has no row and is not in translation_exclude. Excluded texts map to None."""
+    sid, path = src["id"], Path(src["translation_file"])
+    try:
+        blob = path.read_bytes()
+        rows = [json.loads(line) for line in blob.decode("utf-8").splitlines() if line.strip()]
+    except (OSError, ValueError) as e:
+        raise PipelineError(f"{sid}: cannot read translation file {path}: {e}") from e
+    file_sha = hashlib.sha256(blob).hexdigest()
+    if file_sha != src["translation_sha256"]:
+        raise PipelineError(f"{sid}: translation file sha256 {file_sha} differs from translation_sha256 "
+                            f"{src['translation_sha256']}")
+    by_key = {}
+    for r in rows:
+        if (not isinstance(r, dict) or set(r) != {"source_sha256", "text"} or not isinstance(r["text"], str)
+                or not re.fullmatch(r"[0-9a-f]{64}", str(r["source_sha256"]))):
+            raise PipelineError(f"{sid}: malformed translation row {r!r}")
+        if r["source_sha256"] in by_key:
+            raise PipelineError(f"{sid}: duplicate translation row for {r['source_sha256']}")
+        by_key[r["source_sha256"]] = r["text"]
+    exclude = src.get("translation_exclude") or {}
+    keys = {source_sha256(t) for t in texts}
+    if unmatched := sorted(set(by_key) - keys):
+        raise PipelineError(f"{sid}: {len(unmatched)} translation rows match no selected text, "
+                            f"e.g. {unmatched[0]}")
+    if bad := sorted(set(exclude) - (keys - set(by_key))):
+        raise PipelineError(f"{sid}: translation_exclude entries must be selected texts without a row: {bad}")
+    if missing := sorted(keys - set(by_key) - set(exclude)):
+        raise PipelineError(f"{sid}: {len(missing)} selected texts have a missing translation, "
+                            f"e.g. {missing[0]}")
+    outs = [by_key.get(source_sha256(t)) for t in texts]
+    return outs, {"file": str(src["translation_file"]), "sha256": file_sha, "file_rows": len(rows),
+                  "selected": len(texts), "excluded": sum(o is None for o in outs)}
+
+
+def translated_rows(src: dict, texts: list[str], outs: list[str | None], overlap: set[int]
+                    ) -> tuple[list[dict], dict]:
+    """B12, B14: drop (and count) English-overlap, empty, identical and no-CJK translations. No OpenCC:
+    the text is used as written."""
+    rows, dropped = [], dict.fromkeys(TRANSLATION_DROP_REASONS, 0)
+    for i, (text, zh) in enumerate(zip(texts, outs, strict=True)):
+        if zh is None:  # excluded in the config, counted in "excluded"
+            continue
+        if i in overlap:
+            dropped["english_overlap"] += 1
+        elif not normalise(zh):
+            dropped["empty"] += 1
+        elif normalise(zh) == normalise(text):
+            dropped["identical"] += 1
+        elif not _CJK.search(zh):
+            dropped["no_cjk"] += 1
+        else:
+            rows.append(make_row(zh, src["fixed_label"], src["id"], "train", src["lang"]))
+    return rows, dropped
 
 
 # ---------- near-duplicates (B3) ----------
@@ -446,8 +565,11 @@ def run(config_path: Path, fetch, golden_rows: list[dict], out_dir: Path = DATA_
         lock_path: Path = LOCK_PATH, test_min: int = TEST_MIN, val_min: int = VAL_MIN) -> dict:
     sources = load_config(config_path)
     validate_golden(golden_rows)
+    by_id = {s["id"]: s for s in sources}
     raws = {}
     for src in sources:
+        if src.get("derived_from"):  # committed translation: nothing to download (B12)
+            continue
         try:
             rev, raw = fetch(src)
         except Exception as e:  # noqa: BLE001 - any download error must stop the pipeline
@@ -458,12 +580,27 @@ def run(config_path: Path, fetch, golden_rows: list[dict], out_dir: Path = DATA_
 
     rows, per_source, dropped = [], {}, []
     for src in sources:
+        if src.get("derived_from"):
+            continue
         rs = normalise_source(src, raws[src["id"]], raws)
         if src.get("translation_of") and not rs:
             dropped.append(src["id"])
         per_source[src["id"]] = {"revision": src["revision"], "license": src["license"],
                                  "raw_rows": sum(len(v) for v in raws[src["id"]].values()),
                                  "rows_after_normalise": len(rs)}
+        rows += rs
+    others = [r["text"] for r in rows]  # every downloaded row, before B3 (B14)
+    for src in sources:
+        if not src.get("derived_from"):
+            continue
+        base = by_id[src["derived_from"]]
+        texts = derived_source_texts(src, base, raws[base["id"]])
+        outs, tr_info = load_translation(src, texts)
+        rs, tr_dropped = translated_rows(src, texts, outs, english_overlap(texts, others))
+        per_source[src["id"]] = {"derived_from": base["id"], "revision": base["revision"],
+                                 "license": src["license"], "raw_rows": len(texts),
+                                 "rows_after_normalise": len(rs),
+                                 "translation": {**tr_info, "dropped": tr_dropped}}
         rows += rs
 
     kept, dedupe_stats = dedupe(rows)
@@ -509,6 +646,9 @@ def prepare(config_path: Path = CONFIG_PATH, out_dir: Path = DATA_DIR, lock_path
     elapsed = time.perf_counter() - t0
     for sid, info in lock["sources"].items():
         print(f"source {sid}: raw={info['raw_rows']} normalised={info['rows_after_normalise']}")
+        if "translation" in info:
+            tr = info["translation"]
+            print(f"      translation excluded={tr['excluded']} dropped={tr['dropped']} sha256={tr['sha256']}")
     print(f"dropped sources: {lock['dropped_sources'] or 'none'}")
     print(f"removed: {json.dumps(lock['removed'])}")
     for s in SPLITS:

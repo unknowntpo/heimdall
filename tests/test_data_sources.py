@@ -1,5 +1,7 @@
 """R1.2, R1.11 (and B1): fail closed on licence, allow-list, download and revision problems."""
 
+import hashlib
+import json
 import re
 import tomllib
 from pathlib import Path
@@ -16,6 +18,7 @@ ACCEPTED = {
     "Lakera/gandalf_ignore_instructions",
     "databricks/databricks-dolly-15k",
     "rikka-snow/prompt-injection-multilingual",
+    "databricks/databricks-dolly-15k#zh-Hant",
 }
 
 
@@ -111,5 +114,23 @@ def test_R1_2_real_config_lists_exactly_the_accepted_pinned_sources():
     sources = load_config(path)  # passes the same B10 validation the pipeline uses
     assert {s["id"] for s in sources} == ACCEPTED
     for s in tomllib.loads(path.read_text())["source"]:
-        assert re.fullmatch(r"[0-9a-f]{40}", s["revision"]), s["id"]
+        if s.get("derived_from"):  # committed translation: pinned by its sha256 in the lock, no Hub revision
+            assert "revision" not in s and s["translation_file"], s["id"]
+        else:
+            assert re.fullmatch(r"[0-9a-f]{40}", s["revision"]), s["id"]
         assert s["license"] and s["allowed"] is True
+
+
+def test_R1_14_real_config_translates_the_unused_dolly_rows_from_a_committed_file():
+    sources = {s["id"]: s for s in load_config(REPO / "configs" / "sources.toml")}
+    tr = sources["databricks/databricks-dolly-15k#zh-Hant"]
+    assert tr["derived_from"] == "databricks/databricks-dolly-15k"
+    assert sources[tr["derived_from"]]["sample"] == 3000 and tr["sample"] == 2000
+    assert tr["translation_file"] == "sources/dolly-zh-hant.jsonl"
+    assert (REPO / tr["translation_file"]).exists() and (REPO / "sources" / "dolly-zh-hant.NOTICE").exists()
+    assert hashlib.sha256((REPO / tr["translation_file"]).read_bytes()).hexdigest() == tr["translation_sha256"]
+    assert "@gmail.com" not in (REPO / tr["translation_file"]).read_text(encoding="utf-8")
+    assert tr["fixed_label"] == "safe" and tr["lang"] == "zh-Hant" and "opencc" not in tr
+    assert tr["split_by_hash"] == ["train", "val", "test"]
+    for line in (REPO / tr["translation_file"]).read_text(encoding="utf-8").splitlines():
+        assert set(json.loads(line)) == {"source_sha256", "text"}  # no English source text

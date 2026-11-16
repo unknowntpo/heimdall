@@ -1,0 +1,24 @@
+sources/dolly-zh-hant.jsonl
+
+This file is a Traditional Chinese (Taiwan) translation of 1947 instructions
+from databricks/databricks-dolly-15k
+(https://huggingface.co/datasets/databricks/databricks-dolly-15k, Hub revision
+bdd27f4d94b9c1f951818a7da7fd7aeea5dbff1a, the `instruction` field only).
+
+Licence: CC BY-SA 3.0 (https://creativecommons.org/licenses/by-sa/3.0/).
+The original work is databricks-dolly-15k by Databricks, Inc., licensed
+under CC BY-SA 3.0. This translation is an adaptation of that work and is
+distributed under the same licence.
+
+Changes: each instruction was machine-translated by an LLM (Claude Haiku),
+which was used strictly as a translator. The prompt asked it to translate
+faithfully into Taiwan Traditional Chinese and never to answer the
+instruction. No instruction was written, rewritten or answered by the LLM.
+Two selected instructions are left out: one quotes song lyrics (the
+translator declined it) and one contains an email address. Both are listed in
+configs/sources.toml under translation_exclude.
+
+Format: one JSON object per line, {"source_sha256", "text"}. source_sha256 is
+the sha256 of the exact English instruction (UTF-8, not normalised). The
+English text is not included; the pipeline joins it from the original
+dataset. See docs/specs/0003-m1-data-pipeline.md (B12, B13).

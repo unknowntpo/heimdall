@@ -1,0 +1,336 @@
+{
+  "name": "m1-zh-negatives",
+  "git_commit": "22859431d80ae80ef419b7df8b12d164d97600de",
+  "test_file": "data/test.jsonl",
+  "test_sha256": "93f8ad461f61394323495262cda0b8c79618caeffc3c2a468afc5dd5bd23e4df",
+  "n_test": 1307,
+  "golden_file": "golden/zh-tw.jsonl",
+  "golden_sha256": "986ccf4c66cb5c830b66fcedd8ca35d0ac5dc846ce5054a1cbf7a2cdd483cca3",
+  "n_golden": 100,
+  "golden_status": "provisional, too-small (unreviewed draft; 50 rows per label)",
+  "positive_class": "injection",
+  "latency": "single request, wall clock per call incl. tokenisation, after 3 warm-up calls",
+  "models": {
+    "keyword": {
+      "model_version": "heimdall-keyword-0.0.1",
+      "threshold": 0.5,
+      "device": "cpu",
+      "metrics": {
+        "tp": 147,
+        "fp": 10,
+        "fn": 211,
+        "tn": 939,
+        "precision": 0.9363057324840764,
+        "recall": 0.4106145251396648,
+        "f1": 0.570873786407767,
+        "fpr": 0.01053740779768177,
+        "latency_ms_p50": 0.009624985978007317,
+        "latency_ms_p95": 0.18254201859235764
+      },
+      "test_by_lang": {
+        "de": {
+          "n": 40,
+          "tp": 0,
+          "fp": 0,
+          "fn": 20,
+          "tn": 20,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "fpr": 0.0
+        },
+        "en": {
+          "n": 878,
+          "tp": 142,
+          "fp": 10,
+          "fn": 137,
+          "tn": 589,
+          "precision": 0.9342105263157895,
+          "recall": 0.5089605734767025,
+          "f1": 0.6589327146171694,
+          "fpr": 0.01669449081803005
+        },
+        "zh-Hant": {
+          "n": 389,
+          "tp": 5,
+          "fp": 0,
+          "fn": 54,
+          "tn": 330,
+          "precision": 1.0,
+          "recall": 0.0847457627118644,
+          "f1": 0.15625,
+          "fpr": 0.0
+        }
+      },
+      "golden": {
+        "tp": 16,
+        "fp": 4,
+        "fn": 34,
+        "tn": 46,
+        "precision": 0.8,
+        "recall": 0.32,
+        "f1": 0.45714285714285713,
+        "fpr": 0.08,
+        "benign_imperative": {
+          "n": 30,
+          "fp": 1,
+          "fpr": 0.03333333333333333
+        },
+        "by_category": {
+          "benign-imperative": {
+            "n": 30,
+            "tp": 0,
+            "fp": 1,
+            "fn": 0,
+            "tn": 29,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "fpr": 0.03333333333333333
+          },
+          "benign-question": {
+            "n": 10,
+            "tp": 0,
+            "fp": 0,
+            "fn": 0,
+            "tn": 10,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "fpr": 0.0
+          },
+          "benign-security-topic": {
+            "n": 10,
+            "tp": 0,
+            "fp": 3,
+            "fn": 0,
+            "tn": 7,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "fpr": 0.3
+          },
+          "direct-override": {
+            "n": 15,
+            "tp": 3,
+            "fp": 0,
+            "fn": 12,
+            "tn": 0,
+            "precision": 1.0,
+            "recall": 0.2,
+            "f1": 0.33333333333333337,
+            "fpr": 0.0
+          },
+          "indirect": {
+            "n": 10,
+            "tp": 7,
+            "fp": 0,
+            "fn": 3,
+            "tn": 0,
+            "precision": 1.0,
+            "recall": 0.7,
+            "f1": 0.8235294117647058,
+            "fpr": 0.0
+          },
+          "jailbreak-roleplay": {
+            "n": 10,
+            "tp": 3,
+            "fp": 0,
+            "fn": 7,
+            "tn": 0,
+            "precision": 1.0,
+            "recall": 0.3,
+            "f1": 0.4615384615384615,
+            "fpr": 0.0
+          },
+          "obfuscated": {
+            "n": 5,
+            "tp": 1,
+            "fp": 0,
+            "fn": 4,
+            "tn": 0,
+            "precision": 1.0,
+            "recall": 0.2,
+            "f1": 0.33333333333333337,
+            "fpr": 0.0
+          },
+          "prompt-extraction": {
+            "n": 10,
+            "tp": 2,
+            "fp": 0,
+            "fn": 8,
+            "tn": 0,
+            "precision": 1.0,
+            "recall": 0.2,
+            "f1": 0.33333333333333337,
+            "fpr": 0.0
+          }
+        }
+      }
+    },
+    "encoder": {
+      "model_version": "heimdall-spike-encoder-e2",
+      "base_model": "distilbert/distilbert-base-multilingual-cased",
+      "encoder_dir": "artifacts/encoder",
+      "n_train": 5626,
+      "threshold": 0.11190150678157806,
+      "threshold_source": "val (max F1)",
+      "device": "mps",
+      "train_git_commit": "22859431d80ae80ef419b7df8b12d164d97600de",
+      "train_sha256": "95006df7ee2c8071b8746b1773b85ec6b7a01756e719c6cbdc70bef87b160e94",
+      "val_sha256": "d4ec5ce6362e2e54be4f22474fa33bb95d11cab2f9200558ab7ddb69eef840f5",
+      "metrics": {
+        "tp": 347,
+        "fp": 15,
+        "fn": 11,
+        "tn": 934,
+        "precision": 0.9585635359116023,
+        "recall": 0.9692737430167597,
+        "f1": 0.9638888888888889,
+        "fpr": 0.015806111696522657,
+        "latency_ms_p50": 8.664000080898404,
+        "latency_ms_p95": 26.380833005532622
+      },
+      "test_by_lang": {
+        "de": {
+          "n": 40,
+          "tp": 20,
+          "fp": 0,
+          "fn": 0,
+          "tn": 20,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "fpr": 0.0
+        },
+        "en": {
+          "n": 878,
+          "tp": 272,
+          "fp": 12,
+          "fn": 7,
+          "tn": 587,
+          "precision": 0.9577464788732394,
+          "recall": 0.974910394265233,
+          "f1": 0.9662522202486679,
+          "fpr": 0.02003338898163606
+        },
+        "zh-Hant": {
+          "n": 389,
+          "tp": 55,
+          "fp": 3,
+          "fn": 4,
+          "tn": 327,
+          "precision": 0.9482758620689655,
+          "recall": 0.9322033898305084,
+          "f1": 0.94017094017094,
+          "fpr": 0.00909090909090909
+        }
+      },
+      "golden": {
+        "tp": 45,
+        "fp": 15,
+        "fn": 5,
+        "tn": 35,
+        "precision": 0.75,
+        "recall": 0.9,
+        "f1": 0.8181818181818182,
+        "fpr": 0.3,
+        "benign_imperative": {
+          "n": 30,
+          "fp": 14,
+          "fpr": 0.4666666666666667
+        },
+        "by_category": {
+          "benign-imperative": {
+            "n": 30,
+            "tp": 0,
+            "fp": 14,
+            "fn": 0,
+            "tn": 16,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "fpr": 0.4666666666666667
+          },
+          "benign-question": {
+            "n": 10,
+            "tp": 0,
+            "fp": 0,
+            "fn": 0,
+            "tn": 10,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "fpr": 0.0
+          },
+          "benign-security-topic": {
+            "n": 10,
+            "tp": 0,
+            "fp": 1,
+            "fn": 0,
+            "tn": 9,
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1": 0.0,
+            "fpr": 0.1
+          },
+          "direct-override": {
+            "n": 15,
+            "tp": 14,
+            "fp": 0,
+            "fn": 1,
+            "tn": 0,
+            "precision": 1.0,
+            "recall": 0.9333333333333333,
+            "f1": 0.9655172413793104,
+            "fpr": 0.0
+          },
+          "indirect": {
+            "n": 10,
+            "tp": 8,
+            "fp": 0,
+            "fn": 2,
+            "tn": 0,
+            "precision": 1.0,
+            "recall": 0.8,
+            "f1": 0.888888888888889,
+            "fpr": 0.0
+          },
+          "jailbreak-roleplay": {
+            "n": 10,
+            "tp": 10,
+            "fp": 0,
+            "fn": 0,
+            "tn": 0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "fpr": 0.0
+          },
+          "obfuscated": {
+            "n": 5,
+            "tp": 5,
+            "fp": 0,
+            "fn": 0,
+            "tn": 0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1": 1.0,
+            "fpr": 0.0
+          },
+          "prompt-extraction": {
+            "n": 10,
+            "tp": 8,
+            "fp": 0,
+            "fn": 2,
+            "tn": 0,
+            "precision": 1.0,
+            "recall": 0.8,
+            "f1": 0.888888888888889,
+            "fpr": 0.0
+          }
+        }
+      }
+    }
+  }
+}

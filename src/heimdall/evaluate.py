@@ -7,25 +7,21 @@ the golden set is only scored here and never feeds training, checkpoint selectio
 from __future__ import annotations
 
 import json
-import subprocess
 import time
 from pathlib import Path
 
 from heimdall import keyword
-from heimdall.data import DATA_DIR, GOLDEN_PATH, load_jsonl, sha256_file
+from heimdall.data import DATA_DIR, GOLDEN_PATH, git_commit, load_jsonl, sha256_file
 from heimdall.metrics import binary_metrics, percentile
 
 REPORT_DIR = Path("reports")
 BENIGN_IMPERATIVE = "benign-imperative"
 
 
-def _git_commit() -> str:
-    try:
-        sha = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
-        dirty = subprocess.check_output(["git", "status", "--porcelain", "--untracked-files=no"], text=True).strip()
-        return sha + ("-dirty" if dirty else "")
-    except (OSError, subprocess.CalledProcessError):
-        return "unknown"
+def encoder_provenance(meta: dict) -> dict:
+    """B15: the commit and split sha256 the encoder recorded at training time (None if not recorded)."""
+    return {"train_git_commit": meta.get("git_commit"), "train_sha256": meta.get("train_sha256"),
+            "val_sha256": meta.get("val_sha256")}
 
 
 def _run(classify, texts: list[str], warmup: int = 3) -> tuple[list[dict], list[float]]:
@@ -74,7 +70,8 @@ def evaluate(name: str, encoder_dir: Path | None = None, golden_path: Path = GOL
                                      "n_train": guard.meta.get("n_train"),
                                      "threshold": guard.threshold,
                                      "threshold_source": guard.meta["threshold_source"],
-                                     "device": str(guard.device)}),
+                                     "device": str(guard.device),
+                                     **encoder_provenance(guard.meta)}),
     }
     results = {}
     for mname, (fn, info) in models.items():
@@ -89,7 +86,7 @@ def evaluate(name: str, encoder_dir: Path | None = None, golden_path: Path = GOL
 
     report = {
         "name": name,
-        "git_commit": _git_commit(),
+        "git_commit": git_commit(),
         "test_file": "data/test.jsonl",
         "test_sha256": sha256_file(test_path),
         "n_test": len(test),
