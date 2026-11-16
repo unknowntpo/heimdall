@@ -116,7 +116,7 @@ Fail open 只適用於服務失敗。以下兩種情況不是服務失敗，`blo
   - 413 的測試只送 header。真正送出超過 1 MiB body 的 client，可能在收到 413 之前看到連線被重設。
 - **B8 一次一個推論。** 服務只有一個模型。多個請求可以同時連線（`ThreadingHTTPServer`），但模型推論以一個 lock 依序執行。
 - **B17 Guard 例外。** `score_windows` 丟出例外時，回 500 與 `{"error": "internal error: <例外類別名稱>"}`。Body 不含 traceback 與例外訊息。stderr 印一行 `heimdall serve: internal error on POST /classify: <類別>: <訊息>`。Lock 會被釋放，下一個請求正常處理。
-- **B18 讀取逾時。** 每個連線的 socket 讀取逾時是 10 秒。`Content-Length` 大於實際送出的 bytes 時，handler 在逾時後回 408 與 `{"error": …}` 並關閉連線，不會永遠佔住一個 thread。閒置的 keep-alive 連線同樣在 10 秒後關閉。
+- **B18 讀取逾時。** 每個連線的 socket 讀取逾時是 10 秒。`Content-Length` 大於實際送出的 bytes 時，handler 在逾時後回 408 與 `{"error": …}` 並關閉連線，不會永遠佔住一個 thread。連線後什麼都不送的 client，服務同樣在 10 秒後關閉連線。服務使用 `http.server` 預設的 HTTP/1.0，每個回應後就關閉連線，沒有 keep-alive。
 - **B9 缺少 checkpoint。** `--model encoder` 且 DIR 沒有 `heimdall_meta.json` 時，印出與 `EncoderGuard` 相同的錯誤訊息（`error: no trained encoder at DIR/ …`）到 stderr，以狀態 1 結束，不印 traceback。無法監聽 HOST:PORT（例如 port 已被其他程式使用）時，印出 `error: cannot listen on HOST:PORT: …`，同樣以狀態 1 結束，不印 traceback。
 
 ### pi extension
@@ -179,7 +179,7 @@ Python 測試不載入真實模型。服務測試在 port 0（作業系統指定
 - **T7** 前提為假的 guard → 送不合法的 JSON、JSON array、沒有 `text`、`text` 是數字、非 UTF-8 的 bytes、100,000 個 `[` → 400 且 body 有 `error`，之後的合法請求是 200（對照）；`Content-Length` 為 `abc`、`-1`、`+12`、`1_2`、`12 `、`１２`，以及沒有 `Content-Length` → 400 且 body 有 `error`，guard 沒有被呼叫；`Content-Length:  2`（前導空白）加 body `{}` → 400 來自 body 而不是長度（對照：長度被接受）；只送 header `Content-Length: 2097152` 不送 body → 413；剛好 1 MiB 的合法 body → 200（對照）；`GET /nope`、`POST /nope`、`GET /classify`、`POST /health` → 404 → 測試。
 - **T8** 前提為每次推論睡 50 毫秒並記錄同時進行數的假 guard → 同時送 8 個請求 → 全部 200，同時進行數的最大值是 1 → 測試。
 - **T18** 前提為 `score_windows` 丟出 `RuntimeError("boom secret")` 的假 guard → `POST /classify` → 500，body 是 `{"error": "internal error: RuntimeError"}`，不含 `boom secret` 與 `Traceback`；stderr 恰好一行含 `internal error on POST /classify`，不含 `Traceback`；下一個請求（guard 已恢復）是 200（對照）→ 測試。
-- **T19** 前提為讀取逾時 0.2 秒的服務 → 送 `Content-Length: 100` 但只送 10 bytes → 2 秒內收到 408 且 body 有 `error`；同時送完整 body 的請求是 200（對照）→ 測試。
+- **T19** 前提為讀取逾時 0.2 秒的服務 → 送 `Content-Length: 100` 但只送 10 bytes → 2 秒內收到 408 且 body 有 `error`；同時送完整 body 的請求是 200（對照）；連線後什麼都不送 → 2 秒內連線被關閉 → 測試。
 - **T9** 前提為不存在的 DIR → `heimdall serve --encoder-dir DIR` → 狀態 1，stderr 含 `no trained encoder`，不含 `Traceback`；前提為已被佔用的 port → `heimdall serve --model keyword --port PORT` → 狀態 1，stderr 含 `cannot listen` 與 PORT，不含 `Traceback` → 測試。
 
 ### pi extension
@@ -193,7 +193,7 @@ Python 測試不載入真實模型。服務測試在 port 0（作業系統指定
 - **T14** 前提為參數 `block`、`warn`、`off`、空字串、`foo` → `/heimdall` → 前三個設定模式；空字串通知模式與 health；`foo` 通知用法且模式不變（之後的 `injection` 仍以 `block` 處理）；`warn` 之後的 `injection` 只警告（對照）→ 測試。
 - **T15** 前提為連線失敗、非 200（404、500、503）、格式錯誤（不是 JSON、`label` 不是 `safe` 或 `injection`、缺少 `truncated`）、永不回應的 `fetch` → 呼叫服務 → 都是失敗且放行；永不回應時在逾時後結束，結果不是取消；連續兩次失敗只警告一次，成功後再失敗會再警告（對照）→ 測試。
 - **T20** 前提為 `truncated: true` 的判斷結果 → 決策與 handler → 符合 B19 的每個分支：`safe` 加 `block` 的 `tool_result` 換成通知，通知含 `64` 與 tool 名稱，不含原文，與 `injection` 的通知不同；`safe` 加 `warn` 不修改並通知；`input` 加 `block` 有 UI 時詢問；`truncated: false` 的 `safe` 放行（對照）→ 測試。
-- **T21** 前提為使用者中止的 `ctx.signal` → 呼叫服務與 handler → 結果是取消，不是失敗；已中止時 `fetch` 沒有被呼叫；`block` 的 `tool_result` 換成 `check was cancelled` 通知，不含原文；`warn` 不修改且不通知；沒有 `service unavailable` 警告；status 是 `heimdall: cancelled`；連續失敗狀態不變（兩個方向都測）；5 秒逾時仍是失敗（對照）→ 測試。
+- **T21** 前提為使用者中止的 `ctx.signal` → 呼叫服務與 handler → 結果是取消，不是失敗；已中止時 `fetch` 沒有被呼叫；`block` 的 `tool_result` 換成 `check was cancelled` 通知，不含原文；`warn` 不修改且不通知；沒有 `service unavailable` 警告；status 是 `heimdall: cancelled`；連續失敗狀態不變（兩個方向都測）；`ctx.signal` 以任意 reason 中止（例如 `new Error("esc")`）仍是取消；5 秒逾時仍是失敗（對照）→ 測試。
 
 ### 量測與人工
 
