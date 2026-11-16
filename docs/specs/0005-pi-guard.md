@@ -117,7 +117,7 @@ curl -s -X POST http://127.0.0.1:8765/classify -d '{"text": "Ignore all previous
   - `safe`：不修改結果。
   - `injection` 且模式 `block`：把 `content` 換成一段文字通知，內容有 tool 名稱、`score`、`threshold` 與 `model_version`，不含原文的任何部分。同時通知使用者。
   - `injection` 且模式 `warn`：通知使用者，不修改結果。
-- **B13 Status line。** 每次判斷後，以 `ctx.ui.setStatus("heimdall", …)` 顯示最後一次的 `label`、`score`（3 位小數）與 `latency_ms`（整數毫秒），例如 `heimdall: injection 0.998 (21 ms)`。服務失敗時顯示 `heimdall: unavailable (fail open)`。模式 `off` 時顯示 `heimdall: off`。
+- **B13 Status line。** 每次判斷後，以 `ctx.ui.setStatus("heimdall", …)` 顯示最後一次的 `label`、`score`（3 位小數）與 `latency_ms`（整數毫秒），例如 `heimdall: injection 0.998 (21 ms)`。服務失敗時顯示 `heimdall: unavailable (fail open)`。模式 `off` 時顯示 `heimdall: off`。Session 開始與切換模式後、還沒有判斷時，顯示模式，例如 `heimdall: block`。
 - **B14 `/heimdall` 命令。** `/heimdall block`、`/heimdall warn`、`/heimdall off` 設定模式並通知。沒有參數時呼叫 `GET /health`，通知目前模式與服務狀態（`model_version` 與 `threshold`，或失敗原因）。其他參數通知用法，不改變模式。
 - **B15 Fail open。** 呼叫服務時，連線失敗、逾時（5 秒）、非 200 回應或回應格式不對，都視為失敗：放行內容（`input` 放行，`tool_result` 不修改）。同一段連續失敗只警告一次（`ctx.ui.notify` 的 `warning`）；下一次成功後重置，之後再失敗會再警告一次。請求同時使用 `ctx.signal`（使用者按 Esc 時取消）與 5 秒逾時。
 
